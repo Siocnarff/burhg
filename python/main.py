@@ -1,14 +1,3 @@
-# import requests
-
-# image_data = open("images/8.jpg","rb").read()
-
-# response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data}).json()
-
-# for object in response["predictions"]:
-#     print(object["label"])
-
-# print(response)
-
 import requests
 from PIL import Image
 import io
@@ -50,16 +39,16 @@ def recheck(image):
 
     answer = requests.post("http://localhost:81/v1/vision/detection",files={"image":img_byte_arr},data={"min_confidence":0.80}).json()
 
-    print("Detailed check:")
-    print(answer)
-    print("-------------------------")
+    print("    Detailed check:")
+    print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
-        label = object["label"]
+        print(f'    {object["label"]} ({object["confidence"]})')
         cropped = crop(image, object, 0)
-        cropped.save("1image{}_{}.jpg".format(i,label))
+        cropped.save("out/1image{}_{}.jpg".format(i,object["label"]))
         i += 1
-
+    print("    ---------------------")
+   
 
 def findBunch(arr, current, objects, i, dist):
     arr[current] = i
@@ -80,18 +69,27 @@ def update(current, new):
         current["y_max"] = new["y_max"]
     current["label"] = new["label"]
 
+
+
+#==== Code    ===============================================================
+#============================================================================
+
 a = "153"
 #"fotos/IMG_20210121_081" + a + ".jpg"
-image_data = open("special/falseDog.jpg","rb").read()
-print(type(image_data))
-image = Image.open("special/falseDog.jpg").convert("RGB")
+image_data = open("fotos/special/horse.jpg","rb").read()
+image = Image.open("fotos/special/horse.jpg").convert("RGB")
 
 width = image.width
 height = image.height
 
 response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.60}).json()
 
-#loners = response["predictions"]
+print("Inital Predictions:")
+print('=========================')
+for object in response["predictions"]:
+    print(f'{object["label"]} ({object["confidence"]})')
+print('=========================\n')
+
 
 setIndex = []
 for object in response["predictions"]:
@@ -103,6 +101,7 @@ for i in range(len(setIndex)):
         findBunch(setIndex, i, response["predictions"], index, 200)
         index += 1
 
+print("Groups:")
 print(setIndex)
 
 objects = []
@@ -117,8 +116,9 @@ for i in range(1, index):
             update(objects[i-1], response["predictions"][pos]);
             bunch = True
 
-print(objects)
+#print(objects)
 
+print("\nGroup Checks:")
 i = 0
 for object in objects:
     label = object["label"]
@@ -126,7 +126,5 @@ for object in objects:
     if label == "person" or not(object["loner"]):
         recheck(crop(image, object, 0.5))
     cropped = crop(image, object, 0.5)
-    cropped.save("0image{}_{}.jpg".format(i,label))
+    cropped.save("out/0image{}_{}.jpg".format(i,label))
     i += 1
-
-#print(response)
