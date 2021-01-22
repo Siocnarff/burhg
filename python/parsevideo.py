@@ -1,56 +1,30 @@
-import numpy as np
 import cv2
+import os
 
-# Open the video
-cap = cv2.VideoCapture('vid.mp4')
+cam = cv2.VideoCapture(f'videos/{input("Video To Read From: ")}.mp4')
+period = int(input("Period: "))
 
-# Initialize frame counter
-cnt = 0
+try: 
+    if not os.path.exists('data'): 
+        os.makedirs('data') 
 
-# Some characteristics from the original video
-w_frame, h_frame = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps, frames = cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
+except OSError: 
+    print ('Error: Creating directory for data') 
 
-# Here you can define your croping values
-x,y,h,w = 0,0,100,100
+label = 0
 
-# output
-fourcc = cv2.VideoWriter_fourcc(*'XVID')
-out = cv2.VideoWriter('result.avi', fourcc, fps, (w, h))
+while(True):
+    ret,frame = cam.read()
 
+    if ret:
+        if(label%period == 0):
+            name = "./data/" + str(label) + ".jpg"
+            print ('Creating...' + name) 
 
-# Now we start
-while(cap.isOpened()):
-    ret, frame = cap.read()
-
-    cnt += 1 # Counting frames
-
-    # Avoid problems when video finish
-    if ret==True:
-        # Croping the frame
-        crop_frame = frame[y:y+h, x:x+w]
-
-        # Percentage
-        xx = cnt *100/frames
-        print(int(xx),'%')
-
-        # Saving from the desired frames
-        #if 15 <= cnt <= 90:
-        #    out.write(crop_frame)
-
-        # I see the answer now. Here you save all the video
-        out.write(crop_frame)
-
-        # Just to see the video in real time          
-        cv2.imshow('frame',frame)
-        cv2.imshow('croped',crop_frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            cv2.imwrite(name,frame)
     else:
         break
+    label += 1
 
-
-cap.release()
-out.release()
+cam.release()
 cv2.destroyAllWindows()
