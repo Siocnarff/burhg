@@ -122,7 +122,7 @@ print("\nGroup Checks:")
 i = 0
 for object in objects:
     label = object["label"]
-    print(label)
+    print(f'{i+1}) {label}')
     if label == "person" or not(object["loner"]):
         recheck(crop(image, object, 0.5))
     cropped = crop(image, object, 0.5)
