@@ -37,7 +37,7 @@ def recheck(image):
     image.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
 
-    answer = requests.post("http://localhost:81/v1/vision/detection",files={"image":img_byte_arr},data={"min_confidence":0.80}).json()
+    answer = requests.post("http://localhost:81/v1/vision/detection",files={"image":img_byte_arr},data={"min_confidence":0.50}).json()
 
     print("    Detailed check:")
     print("    ---------------------")
@@ -67,7 +67,8 @@ def update(current, new):
         current["x_max"] = new["x_max"]
     if current["y_max"] < new["y_max"]:
         current["y_max"] = new["y_max"]
-    current["label"] = new["label"]
+    if new["label"] == "person":
+        current["label"] = new["label"]
 
 
 
@@ -76,7 +77,7 @@ def update(current, new):
 
 a = "153"
 
-b = "fotos/1/IMG_20210121_072349.jpg"
+b = "fotos/falseDog.jpg"
 #"fotos/IMG_20210121_081" + a + ".jpg"
 image_data = open(b,"rb").read()
 image = Image.open(b).convert("RGB")
@@ -84,7 +85,7 @@ image = Image.open(b).convert("RGB")
 width = image.width
 height = image.height
 
-response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.60}).json()
+response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
 
 print("Inital Predictions:")
 print('=========================')
@@ -127,6 +128,6 @@ for object in objects:
     print(f'{i+1}) {label}')
     cropped = crop(image, object, 0.5)
     cropped.save("out/0image{}_{}.jpg".format(i,label))
-    if not(object["loner"]):
+    if not(object["loner"]) and object["label"] == "person":
         recheck(crop(image, object, 0.5))
     i += 1
