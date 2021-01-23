@@ -76,7 +76,7 @@ def update(current, new):
 
 a = "153"
 
-b = "fotos/1/IMG_20210121_072349.jpg"
+b = "fotos/special/falseDog.jpg"
 #"fotos/IMG_20210121_081" + a + ".jpg"
 image_data = open(b,"rb").read()
 image = Image.open(b).convert("RGB")
@@ -84,7 +84,7 @@ image = Image.open(b).convert("RGB")
 width = image.width
 height = image.height
 
-response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.60}).json()
+response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
 
 print("Inital Predictions:")
 print('=========================')
