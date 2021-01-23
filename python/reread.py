@@ -50,7 +50,7 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
-        mark(labeledImage, object, size, object["label"])
+        mark(labeledImage, object, size, object["label"], "#ffff33")
         print(f'    {object["label"]} ({object["confidence"]})')
         cropped = crop(image, object, 0)
         #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
@@ -80,7 +80,7 @@ def update(current, new):
         if new["confidence"] > current["confidence"]:
             current["confidence"] = new["confidence"]
 
-def mark(labeledImage, object, size, label):
+def mark(labeledImage, object, size, label, colour):
     x_min = size["x_min"] + object["x_min"]
     y_min = size["y_min"] + object["y_min"]
     x_max = size["x_min"] + object["x_max"]
@@ -95,7 +95,7 @@ def mark(labeledImage, object, size, label):
     img1.rectangle(confidenceBack, fill="#000000", outline="#000000", width=5)
     img1.text((x_min, y_min - 25), label, (255,255,255), font=font)
     img1.text((x_min, y_min - 42), str(object["confidence"]), (255,255,255), font=font2)
-    img1.rectangle(shape, fill =None, outline ="#ffff33", width =5) 
+    img1.rectangle(shape, fill =None, outline =colour, width =5) 
     return labeledImage
 
 
@@ -172,9 +172,10 @@ def analyzeFrame(imagePath, imageName, out):
         #cropped.save("{}0image{}_{}.jpg".format(out,i,label))
 
         if not(object["loner"]) and object["label"] == "person":
+            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
             recheck(cropped, cropObj(object, 0.5), labeledImage, out)
         else:
-            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label)
+            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#ffff33")
         i += 1
 
     labeledImage.save("{}labaledImage_{}".format(out,imageName))
