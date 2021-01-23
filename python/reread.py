@@ -1,5 +1,5 @@
 import requests
-from PIL import Image
+from PIL import Image, ImageDraw
 import io
 import math
 
@@ -12,7 +12,7 @@ def centerabs(object):
     c = center(object)
     return tuple((c[0] + object["x_min"], c[1] + object["y_min"]))
 
-def crop(image, object, sf):
+def calculateCrop(object, sf):
     c = center(object)
     y_max = int(object["y_max"]) + c[1]*sf
     if y_max > height:
@@ -26,13 +26,20 @@ def crop(image, object, sf):
     x_min = int(object["x_min"]) - c[0]*sf
     if x_min < 0:
         x_min = 0
+    return [x_min,y_min,x_max,y_max]
 
-    return image.crop((x_min,y_min,x_max,y_max))
+def crop(image, object, sf):
+    values = calculateCrop(object, sf)
+    return image.crop((values[0],values[1],values[2],values[3]))
+
+def cropObj(object, sf):
+    c = calculateCrop(object, sf)
+    return {"x_min":c[0], "x_max":c[2], "y_min":c[1], "y_max":c[3]}
 
 def distance(one, two):
     return math.sqrt((one[0]-two[0])**2 + (one[1]-two[1])**2)
 
-def recheck(image):
+def recheck(image, size, labeledImage, out):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
@@ -43,9 +50,10 @@ def recheck(image):
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
+        mark(labeledImage, object, size)
         print(f'    {object["label"]} ({object["confidence"]})')
         cropped = crop(image, object, 0)
-        cropped.save("out/1image{}_{}.jpg".format(i,object["label"]))
+        #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
         i += 1
     print("    ---------------------")
    
@@ -70,64 +78,87 @@ def update(current, new):
     if new["label"] == "person":
         current["label"] = new["label"]
 
+def mark(labeledImage, object, size):
+    x_min = size["x_min"] + object["x_min"]
+    y_min = size["y_min"] + object["y_min"]
+    x_max = size["x_min"] + object["x_max"]
+    y_max = size["y_min"] + object["y_max"]
+    shape = [(x_min, y_min), (x_max, y_max)]
+    img1 = ImageDraw.Draw(labeledImage)   
+    img1.rectangle(shape, fill =None, outline ="#ffff33", width =5) 
+    return labeledImage
+
 
 
 #==== Code    ===============================================================
 #============================================================================
 
-a = "153"
-
-b = "fotos/falseDog.jpg"
-#"fotos/IMG_20210121_081" + a + ".jpg"
-image_data = open(b,"rb").read()
-image = Image.open(b).convert("RGB")
-
-width = image.width
-height = image.height
-
-response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
-
-print("Inital Predictions:")
-print('=========================')
-for object in response["predictions"]:
-    print(f'{object["label"]} ({object["confidence"]})')
-print('=========================\n')
+#imagePath = "fotos/special/"
+#imageName = "falseDog.jpg"
 
 
-setIndex = []
-for object in response["predictions"]:
-    setIndex.append(0)
+def analyzeFrame(imagePath, imageName, out):
 
-index = 1
-for i in range(len(setIndex)):
-    if setIndex[i] == 0:
-        findBunch(setIndex, i, response["predictions"], index, 200)
-        index += 1
+    #"fotos/IMG_20210121_081" + a + ".jpg"
+    image_data = open(imagePath + imageName,"rb").read()
+    image = Image.open(imagePath + imageName).convert("RGB")
 
-print("Groups:")
-print(setIndex)
+    global width
+    global height
 
-objects = []
+    width = image.width
+    height = image.height
 
-for i in range(1, index):
-    objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":""})
-    bunch = False
-    for pos, key in enumerate(setIndex):
-        if key == i:
-            if bunch == True:
-                objects[i-1]["loner"] = False
-            update(objects[i-1], response["predictions"][pos]);
-            bunch = True
+    response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
 
-#print(objects)
+    print("Inital Predictions:")
+    print('=========================')
+    for object in response["predictions"]:
+        print(f'{object["label"]} ({object["confidence"]})')
+    print('=========================\n')
 
-print("\nGroup Checks:")
-i = 0
-for object in objects:
-    label = object["label"]
-    print(f'{i+1}) {label}')
-    cropped = crop(image, object, 0.5)
-    cropped.save("out/0image{}_{}.jpg".format(i,label))
-    if not(object["loner"]) and object["label"] == "person":
-        recheck(crop(image, object, 0.5))
-    i += 1
+
+    setIndex = []
+    for object in response["predictions"]:
+        setIndex.append(0)
+
+    index = 1
+    for i in range(len(setIndex)):
+        if setIndex[i] == 0:
+            findBunch(setIndex, i, response["predictions"], index, 200)
+            index += 1
+
+    print("Groups:")
+    print(setIndex)
+
+    objects = []
+
+    for i in range(1, index):
+        objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":""})
+        bunch = False
+        for pos, key in enumerate(setIndex):
+            if key == i:
+                if bunch == True:
+                    objects[i-1]["loner"] = False
+                update(objects[i-1], response["predictions"][pos])
+                bunch = True
+
+    #print(objects)
+
+    labeledImage = image
+
+    print("\nGroup Checks:")
+    i = 0
+    for object in objects:
+        label = object["label"]
+        print(f'{i+1}) {label}')
+        cropped = crop(image, object, 0.5)
+        #cropped.save("{}0image{}_{}.jpg".format(out,i,label))
+
+        if not(object["loner"]) and object["label"] == "person":
+            recheck(cropped, cropObj(object, 0.5), labeledImage, out)
+        else:
+            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height})
+        i += 1
+
+    labeledImage.save("{}labaledImage_{}".format(out,imageName))
