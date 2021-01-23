@@ -77,6 +77,8 @@ def update(current, new):
         current["y_max"] = new["y_max"]
     if new["label"] == "person" or current["label"] == "":
         current["label"] = new["label"]
+        if new["confidence"] > current["confidence"]:
+            current["confidence"] = new["confidence"]
 
 def mark(labeledImage, object, size, label):
     x_min = size["x_min"] + object["x_min"]
@@ -85,10 +87,14 @@ def mark(labeledImage, object, size, label):
     y_max = size["y_min"] + object["y_max"]
     shape = [(x_min, y_min), (x_max, y_max)]
     textBack = [(x_min, y_min - 20),(x_min + len(label)*11, y_min - 2)]
+    confidenceBack = [(x_min, y_min - 40),(x_min + len(str(object["confidence"]))*11, y_min - 20)]
     img1 = ImageDraw.Draw(labeledImage)   
     font = ImageFont.truetype("arial.ttf", 22)
+    font2 = ImageFont.truetype("arial.ttf", 20)
     img1.rectangle(textBack, fill="#000000", outline="#000000", width=5)
+    img1.rectangle(confidenceBack, fill="#000000", outline="#000000", width=5)
     img1.text((x_min, y_min - 25), label, (255,255,255), font=font)
+    img1.text((x_min, y_min - 42), str(object["confidence"]), (255,255,255), font=font2)
     img1.rectangle(shape, fill =None, outline ="#ffff33", width =5) 
     return labeledImage
 
@@ -144,7 +150,7 @@ def analyzeFrame(imagePath, imageName, out):
     objects = []
 
     for i in range(1, index):
-        objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":""})
+        objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":"", "confidence":-1})
         bunch = False
         for pos, key in enumerate(setIndex):
             if key == i:
