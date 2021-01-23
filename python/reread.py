@@ -1,5 +1,5 @@
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import io
 import math
 
@@ -50,7 +50,7 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
-        mark(labeledImage, object, size)
+        mark(labeledImage, object, size, object["label"])
         print(f'    {object["label"]} ({object["confidence"]})')
         cropped = crop(image, object, 0)
         #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
@@ -75,16 +75,20 @@ def update(current, new):
         current["x_max"] = new["x_max"]
     if current["y_max"] < new["y_max"]:
         current["y_max"] = new["y_max"]
-    if new["label"] == "person":
+    if new["label"] == "person" or current["label"] == "":
         current["label"] = new["label"]
 
-def mark(labeledImage, object, size):
+def mark(labeledImage, object, size, label):
     x_min = size["x_min"] + object["x_min"]
     y_min = size["y_min"] + object["y_min"]
     x_max = size["x_min"] + object["x_max"]
     y_max = size["y_min"] + object["y_max"]
     shape = [(x_min, y_min), (x_max, y_max)]
+    textBack = [(x_min, y_min - 20),(x_min + len(label)*11, y_min - 2)]
     img1 = ImageDraw.Draw(labeledImage)   
+    font = ImageFont.truetype("arial.ttf", 22)
+    img1.rectangle(textBack, fill="#000000", outline="#000000", width=5)
+    img1.text((x_min, y_min - 25), label, (255,255,255), font=font)
     img1.rectangle(shape, fill =None, outline ="#ffff33", width =5) 
     return labeledImage
 
@@ -100,7 +104,13 @@ def mark(labeledImage, object, size):
 def analyzeFrame(imagePath, imageName, out):
 
     #"fotos/IMG_20210121_081" + a + ".jpg"
-    image_data = open(imagePath + imageName,"rb").read()
+    error_to_catch = getattr(__builtins__,'FileNotFoundError', IOError)
+
+    try:
+        image_data = open(imagePath + imageName,"rb").read()
+    except error_to_catch:
+        return False
+    
     image = Image.open(imagePath + imageName).convert("RGB")
 
     global width
@@ -158,7 +168,8 @@ def analyzeFrame(imagePath, imageName, out):
         if not(object["loner"]) and object["label"] == "person":
             recheck(cropped, cropObj(object, 0.5), labeledImage, out)
         else:
-            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height})
+            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label)
         i += 1
 
     labeledImage.save("{}labaledImage_{}".format(out,imageName))
+    return True
