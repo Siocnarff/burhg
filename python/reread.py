@@ -63,13 +63,16 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
    
 
-def findBunch(arr, current, objects, i, dist):
+def findBunch(arr, current, objects, i, dist, bunch=False):
     arr[current] = i
     index = 0
     for o in objects:
         if arr[index] == 0 and distance(centerabs(o), centerabs(objects[current])) < dist and distance(centerabs(o), centerabs(objects[current])) > 10:
-            findBunch(arr, index, objects, i , dist)
+            bunch = findBunch(arr, index, objects, i , dist, bunch)
         index += 1
+    if objects[current]["confidence"] < 0.60 and objects[current]["label"] == "person":
+        bunch = True
+    return bunch
 
 def update(current, new):
     if current["x_min"] > new["x_min"]:
@@ -146,9 +149,15 @@ def analyzeFrame(imagePath, imageName, out):
     index = 1
     for i in range(len(setIndex)):
         if setIndex[i] == 0:
-            findBunch(setIndex, i, response["predictions"], index, 200)
-            index += 1
-
+            if findBunch(setIndex, i, response["predictions"], index, 200):
+                index += 1
+            else:
+                bunchID = index
+                for j in range(len(setIndex)):
+                    if setIndex[j] == bunchID:
+                        setIndex[j] = index
+                        index += 1
+                        
     print(colored("Groups:",'blue'))
     print(setIndex)
 
