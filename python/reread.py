@@ -77,7 +77,7 @@ def update(current, new):
         current["y_max"] = new["y_max"]
     if new["label"] == "person" or current["label"] == "":
         current["label"] = new["label"]
-        if new["confidence"] > current["confidence"]:
+        if new["confidence"] < current["confidence"]:
             current["confidence"] = new["confidence"]
 
 def mark(labeledImage, object, size, label, colour):
@@ -150,7 +150,7 @@ def analyzeFrame(imagePath, imageName, out):
     objects = []
 
     for i in range(1, index):
-        objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":"", "confidence":-1})
+        objects.append({"x_min":1000000, "x_max":0, "y_min":1000000, "y_max":0, "loner":True, "label":"", "confidence":1})
         bunch = False
         for pos, key in enumerate(setIndex):
             if key == i:
@@ -173,7 +173,8 @@ def analyzeFrame(imagePath, imageName, out):
 
         if not(object["loner"]) and object["label"] == "person":
             mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
-            recheck(cropped, cropObj(object, 0.5), labeledImage, out)
+            if object["confidence"] < 0.8:
+                recheck(cropped, cropObj(object, 0.5), labeledImage, out)
         else:
             mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#ffff33")
         i += 1
