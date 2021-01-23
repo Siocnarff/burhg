@@ -2,6 +2,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 import io
 import math
+from termcolor import colored
 
 def center(object):
     x = (int(object["x_max"]) - int(object["x_min"]))/2
@@ -50,7 +51,11 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
-        mark(labeledImage, object, size, object["label"], "#ffff33")
+        if object["label"] == "person" and object["confidence"] > 0.75:
+            colour = "#ff0000"
+        else:
+            colour = "#ffff33"
+        mark(labeledImage, object, size, object["label"], colour)
         print(f'    {object["label"]} ({object["confidence"]})')
         cropped = crop(image, object, 0)
         #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
@@ -62,7 +67,7 @@ def findBunch(arr, current, objects, i, dist):
     arr[current] = i
     index = 0
     for o in objects:
-        if arr[index] == 0 and distance(centerabs(o), centerabs(objects[current])) < dist:
+        if arr[index] == 0 and distance(centerabs(o), centerabs(objects[current])) < dist and distance(centerabs(o), centerabs(objects[current])) > 10:
             findBunch(arr, index, objects, i , dist)
         index += 1
 
@@ -127,7 +132,7 @@ def analyzeFrame(imagePath, imageName, out):
 
     response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
 
-    print("Inital Predictions:")
+    print(colored(f"{imageName}  Inital Predictions:",'yellow'))
     print('=========================')
     for object in response["predictions"]:
         print(f'{object["label"]} ({object["confidence"]})')
@@ -144,7 +149,7 @@ def analyzeFrame(imagePath, imageName, out):
             findBunch(setIndex, i, response["predictions"], index, 200)
             index += 1
 
-    print("Groups:")
+    print(colored("Groups:",'blue'))
     print(setIndex)
 
     objects = []
@@ -163,7 +168,7 @@ def analyzeFrame(imagePath, imageName, out):
 
     labeledImage = image
 
-    print("\nGroup Checks:")
+    print(colored("\nGroup Checks:",'blue'))
     i = 0
     for object in objects:
         label = object["label"]
@@ -176,8 +181,13 @@ def analyzeFrame(imagePath, imageName, out):
             if object["confidence"] < 0.8:
                 recheck(cropped, cropObj(object, 0.5), labeledImage, out)
         else:
-            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#ffff33")
+            if label == "person" and object["confidence"] > 0.75:
+                colour = "#ff0000"
+            else:
+                colour = "#ffff33"
+            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, colour)
         i += 1
 
     labeledImage.save("{}labaledImage_{}".format(out,imageName))
+    print("====================FIN====================\n")
     return True
