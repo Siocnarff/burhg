@@ -44,7 +44,7 @@ def cropObj(object, sf):
 def distance(one, two):
     return math.sqrt((one[0]-two[0])**2 + (one[1]-two[1])**2)
 
-def recheck(image, size, labeledImage, out):
+def recheck(image, size, labeledImage, out, frame):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
@@ -55,13 +55,16 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
+        if object["label"] == "person":
+            x_min, y_min, x_max, y_max = calculatePos(object, size)
+            frame.append({"center":centerabs({"x_min":x_min, "x_max":x_max, "y_min":y_min, "y_max":y_max,}), "x_min":x_min, "x_max":x_max, "y_min":y_min, "y_max":y_max, "confidence":object["confidence"]})
         if object["label"] == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
             colour = "#ff0000"
         else:
             colour = "#ffff33"
         mark(labeledImage, object, size, object["label"], colour)
         print(f'    {object["label"]} ({object["confidence"]})')
-        cropped = crop(image, object, 0)
+        #cropped = crop(image, object, 0)
         #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
         i += 1
     print("    ---------------------")
@@ -95,11 +98,15 @@ def update(current, new):
         if new["confidence"] < current["confidence"]:
             current["confidence"] = new["confidence"]
 
-def mark(labeledImage, object, size, label, colour):
+def calculatePos(object, size):
     x_min = size["x_min"] + object["x_min"]
     y_min = size["y_min"] + object["y_min"]
     x_max = size["x_min"] + object["x_max"]
     y_max = size["y_min"] + object["y_max"]
+    return x_min, y_min, x_max, y_max
+
+def mark(labeledImage, object, size, label, colour):
+    x_min, y_min, x_max, y_max = calculatePos(object, size)
     shape = [(x_min, y_min), (x_max, y_max)]
     textBack = [(x_min, y_min - 20),(x_min + len(label)*11, y_min - 2)]
     confidenceBack = [(x_min, y_min - 40),(x_min + len(str(object["confidence"]))*11, y_min - 20)]
@@ -122,7 +129,7 @@ def mark(labeledImage, object, size, label, colour):
 #imageName = "falseDog.jpg"
 
 
-def analyzeFrame(imagePath, imageName, out):
+def analyzeFrame(imagePath, imageName, out, frame):
 
     #"fotos/IMG_20210121_081" + a + ".jpg"
     error_to_catch = getattr(__builtins__,'FileNotFoundError', IOError)
@@ -195,8 +202,10 @@ def analyzeFrame(imagePath, imageName, out):
         if not(object["loner"]) and object["label"] == "person":
             mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
             if object["confidence"] < 0.8:
-                recheck(cropped, cropObj(object, 0.5), labeledImage, out)
+                recheck(cropped, cropObj(object, 0.5), labeledImage, out, frame)
         else:
+            if object["label"] == "person":
+                frame.append({"center":centerabs(object), "x_min":object["x_min"], "x_max":object["x_max"], "y_min":object["y_min"], "y_max":object["y_max"], "confidence":object["confidence"]})
             if label == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
                 colour = "#ff0000"
             else:
@@ -204,6 +213,6 @@ def analyzeFrame(imagePath, imageName, out):
             mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, colour)
         i += 1
 
-    labeledImage.save("{}labaledImage_{}".format(out,imageName))
+    #labeledImage.save("{}labaledImage_{}".format(out,imageName))
     print("====================FIN====================\n")
     return True

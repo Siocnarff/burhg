@@ -9,3 +9,7 @@ ai_api:
 
 trigger:
   single_frame: 0.90
+
+time_analysis:
+  length: 5
+  max_jump: 1000
