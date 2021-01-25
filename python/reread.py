@@ -3,6 +3,10 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import math
 from termcolor import colored
+import yaml
+
+with open("config/detection.yml", "r") as ymlfile:
+    cfg = yaml.load(ymlfile)
 
 def center(object):
     x = (int(object["x_max"]) - int(object["x_min"]))/2
@@ -45,13 +49,13 @@ def recheck(image, size, labeledImage, out):
     image.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
 
-    answer = requests.post("http://localhost:81/v1/vision/detection",files={"image":img_byte_arr},data={"min_confidence":0.50}).json()
+    answer = requests.post(cfg["ai_api"]["path"],files={"image":img_byte_arr},data={"min_confidence":cfg["ai_api"]["recheck_confidence"]}).json()
 
     print("    Detailed check:")
     print("    ---------------------")
     i = 0
     for object in answer["predictions"]:
-        if object["label"] == "person" and object["confidence"] > 0.75:
+        if object["label"] == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
             colour = "#ff0000"
         else:
             colour = "#ffff33"
@@ -63,12 +67,15 @@ def recheck(image, size, labeledImage, out):
     print("    ---------------------")
    
 
-def findBunch(arr, current, objects, i, dist, bunch=False):
+def findBunch(arr, current, objects, i, bunch=False):
+    dist = cfg["bunch"]["max_gap"]
     arr[current] = i
     index = 0
     for o in objects:
-        if arr[index] == 0 and distance(centerabs(o), centerabs(objects[current])) < dist and distance(centerabs(o), centerabs(objects[current])) > 10:
-            bunch = findBunch(arr, index, objects, i , dist, bunch)
+        if arr[index] == 0 \
+        and distance(centerabs(o), centerabs(objects[current])) < dist \
+        and distance(centerabs(o), centerabs(objects[current])) > cfg["bunch"]["min_gap"]:
+            bunch = findBunch(arr, index, objects, i, bunch)
         index += 1
     if objects[current]["confidence"] < 0.60 and objects[current]["label"] == "person":
         bunch = True
@@ -133,7 +140,7 @@ def analyzeFrame(imagePath, imageName, out):
     width = image.width
     height = image.height
 
-    response = requests.post("http://localhost:81/v1/vision/detection",files={"image":image_data},data={"min_confidence":0.20}).json()
+    response = requests.post(cfg["ai_api"]["path"],files={"image":image_data},data={"min_confidence":cfg["ai_api"]["confidence"]}).json()
 
     print(colored(f"{imageName}  Inital Predictions:",'yellow'))
     print('=========================')
@@ -149,7 +156,7 @@ def analyzeFrame(imagePath, imageName, out):
     index = 1
     for i in range(len(setIndex)):
         if setIndex[i] == 0:
-            if findBunch(setIndex, i, response["predictions"], index, 200):
+            if findBunch(setIndex, i, response["predictions"], index):
                 index += 1
             else:
                 bunchID = index
@@ -190,7 +197,7 @@ def analyzeFrame(imagePath, imageName, out):
             if object["confidence"] < 0.8:
                 recheck(cropped, cropObj(object, 0.5), labeledImage, out)
         else:
-            if label == "person" and object["confidence"] > 0.75:
+            if label == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
                 colour = "#ff0000"
             else:
                 colour = "#ffff33"

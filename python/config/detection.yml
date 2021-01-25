@@ -1,0 +1,11 @@
+bunch:
+  max_gap: 200
+  min_gap: 10
+
+ai_api:
+  path: "http://localhost:81/v1/vision/detection"
+  confidence: 0.2
+  recheck_confidence: 0.5
+
+trigger:
+  single_frame: 0.90
