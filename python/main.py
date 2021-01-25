@@ -1,6 +1,9 @@
 import reread as rr
 import os
 
+class FrameManager:
+    
+
 folder = input("Folder In data To Read From: ")
 
 try: 
