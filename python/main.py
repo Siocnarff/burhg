@@ -81,10 +81,10 @@ except OSError:
 frameManager = FrameManager()
 fileName = 0
 frame = []
-while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", "media/out/" + folder + "/", frame):
+while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", frame):
     image = Image.open("media/data/" + folder + "/" + str(fileName) + ".jpg").convert("RGB")
     frameManager.add(frame)
-    draw(image, frame)
+    draw(image, frameManager.getCurrent())
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
     fileName += 1
     frame.clear()

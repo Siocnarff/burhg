@@ -44,7 +44,7 @@ def cropObj(object, sf):
 def distance(one, two):
     return math.sqrt((one[0]-two[0])**2 + (one[1]-two[1])**2)
 
-def recheck(image, size, labeledImage, out, frame):
+def recheck(image, size, frame):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
@@ -127,7 +127,7 @@ def calculatePos(object, size):
 #imageName = "falseDog.jpg"
 
 
-def analyzeFrame(imagePath, imageName, out, frame):
+def analyzeFrame(imagePath, imageName, frame):
 
     #"fotos/IMG_20210121_081" + a + ".jpg"
     error_to_catch = getattr(__builtins__,'FileNotFoundError', IOError)
@@ -199,7 +199,7 @@ def analyzeFrame(imagePath, imageName, out, frame):
         if not(object["loner"]) and object["label"] == "person":
             # mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
             if object["confidence"] < 0.8:
-                recheck(cropped, cropObj(object, 0.5), labeledImage, out, frame)
+                recheck(cropped, cropObj(object, 0.5), frame)
         else:
             if object["label"] == "person":
                 frame.append({"center":centerabs(object), "x_min":object["x_min"], "x_max":object["x_max"], "y_min":object["y_min"], "y_max":object["y_max"], "confidence":object["confidence"]})
