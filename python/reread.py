@@ -58,14 +58,12 @@ def recheck(image, size, labeledImage, out, frame):
         if object["label"] == "person":
             x_min, y_min, x_max, y_max = calculatePos(object, size)
             frame.append({"center":centerabs({"x_min":x_min, "x_max":x_max, "y_min":y_min, "y_max":y_max,}), "x_min":x_min, "x_max":x_max, "y_min":y_min, "y_max":y_max, "confidence":object["confidence"]})
-        if object["label"] == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
-            colour = "#ff0000"
-        else:
-            colour = "#ffff33"
-        mark(labeledImage, object, size, object["label"], colour)
+        # if object["label"] == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
+        #     colour = "#ff0000"
+        # else:
+        #     colour = "#ffff33"
+        # mark(labeledImage, object, size, object["label"], colour)
         print(f'    {object["label"]} ({object["confidence"]})')
-        #cropped = crop(image, object, 0)
-        #cropped.save("{}1image{}_{}.jpg".format(out,i,object["label"]))
         i += 1
     print("    ---------------------")
    
@@ -105,20 +103,20 @@ def calculatePos(object, size):
     y_max = size["y_min"] + object["y_max"]
     return x_min, y_min, x_max, y_max
 
-def mark(labeledImage, object, size, label, colour):
-    x_min, y_min, x_max, y_max = calculatePos(object, size)
-    shape = [(x_min, y_min), (x_max, y_max)]
-    textBack = [(x_min, y_min - 20),(x_min + len(label)*11, y_min - 2)]
-    confidenceBack = [(x_min, y_min - 40),(x_min + len(str(object["confidence"]))*11, y_min - 20)]
-    img1 = ImageDraw.Draw(labeledImage)   
-    font = ImageFont.truetype("arial.ttf", 22)
-    font2 = ImageFont.truetype("arial.ttf", 20)
-    img1.rectangle(textBack, fill="#000000", outline="#000000", width=5)
-    img1.rectangle(confidenceBack, fill="#000000", outline="#000000", width=5)
-    img1.text((x_min, y_min - 25), label, (255,255,255), font=font)
-    img1.text((x_min, y_min - 42), str(object["confidence"]), (255,255,255), font=font2)
-    img1.rectangle(shape, fill =None, outline =colour, width =5) 
-    return labeledImage
+# def mark(labeledImage, object, size, label, colour):
+#     x_min, y_min, x_max, y_max = calculatePos(object, size)
+#     shape = [(x_min, y_min), (x_max, y_max)]
+#     textBack = [(x_min, y_min - 20),(x_min + len(label)*11, y_min - 2)]
+#     confidenceBack = [(x_min, y_min - 40),(x_min + len(str(object["confidence"]))*11, y_min - 20)]
+#     img1 = ImageDraw.Draw(labeledImage)   
+#     font = ImageFont.truetype("arial.ttf", 22)
+#     font2 = ImageFont.truetype("arial.ttf", 20)
+#     img1.rectangle(textBack, fill="#000000", outline="#000000", width=5)
+#     img1.rectangle(confidenceBack, fill="#000000", outline="#000000", width=5)
+#     img1.text((x_min, y_min - 25), label, (255,255,255), font=font)
+#     img1.text((x_min, y_min - 42), str(object["confidence"]), (255,255,255), font=font2)
+#     img1.rectangle(shape, fill =None, outline =colour, width =5) 
+#     return labeledImage
 
 
 
@@ -187,32 +185,31 @@ def analyzeFrame(imagePath, imageName, out, frame):
                 update(objects[i-1], response["predictions"][pos])
                 bunch = True
 
-    #print(objects)
+    # print(objects)
 
-    labeledImage = image
+    # labeledImage = image
 
     print(colored("\nGroup Checks:",'blue'))
     i = 0
     for object in objects:
-        label = object["label"]
-        print(f'{i+1}) {label}')
+        print(f'{i+1}) {object["label"]}')
         cropped = crop(image, object, 0.5)
         #cropped.save("{}0image{}_{}.jpg".format(out,i,label))
 
         if not(object["loner"]) and object["label"] == "person":
-            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
+            # mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
             if object["confidence"] < 0.8:
                 recheck(cropped, cropObj(object, 0.5), labeledImage, out, frame)
         else:
             if object["label"] == "person":
                 frame.append({"center":centerabs(object), "x_min":object["x_min"], "x_max":object["x_max"], "y_min":object["y_min"], "y_max":object["y_max"], "confidence":object["confidence"]})
-            if label == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
-                colour = "#ff0000"
-            else:
-                colour = "#ffff33"
-            mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, colour)
+            # if label == "person" and object["confidence"] > cfg["trigger"]["single_frame"]:
+            #     colour = "#ff0000"
+            # else:
+            #     colour = "#ffff33"
+            # mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, colour)
         i += 1
 
-    #labeledImage.save("{}labaledImage_{}".format(out,imageName))
+    # labeledImage.save("{}labaledImage_{}".format(out,imageName))
     print("====================FIN====================\n")
     return True
