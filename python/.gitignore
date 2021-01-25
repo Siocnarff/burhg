@@ -1,0 +1,5 @@
+*config.yml
+*.jpg
+*.mp4
+*.png
+__pycache__/
