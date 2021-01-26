@@ -50,6 +50,8 @@ class FrameManager:
         self.frames[self.index] = frame
 
 def draw(image, objects):
+    if(objects == None):
+        return
     for index, object in enumerate(objects):
         colour = Switch({
             range(20, 55): "#12d900",
@@ -76,6 +78,9 @@ def draw(image, objects):
 def takeSecond(elem):
     return elem[1]
 
+def confidence(elem):
+    return elem["confidence"]
+
 folder = input("Folder In data To Read From: ")
 
 try: 
@@ -90,33 +95,32 @@ fileName = 0
 frame = []
 while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", frame):
     image = Image.open("media/data/" + folder + "/" + str(fileName) + ".jpg").convert("RGB")
-    frameManager.add(frame)
-    frame = []
+    frameManager.add(sorted(frame, key=confidence))
     current = frameManager.getCurrent()
 
     if cfg["time_analysis"]["algo"] == 0:
-        # if frameManager.checkPast(1) == True:
-        #     prev = frameManager.getPast(1)
-        #     combination = []
-        #     for id, person in enumerate(current):
-        #         combination.append([])
-        #         for prevId, prevPerson in enumerate(prev):
-        #             combination[id].append((prevPerson["id"], rr.distance(person["center"], prevPerson["center"])))
-        #         if len(person) > len(prev):
-        #             for i in range(len(person) - len(prev)):
-        #                 combination[id].append((-1,0))
-        #         combination[id].sort(key=takeSecond)
-        #         print("combination")
-        #         print(combination[id])
-            
-        # else:
-        #     for id, person in enumerate(current):
-        #         person["id"] = id
-        #     frameManager.setCurrent(current)
-    elif cfg["time_analysis"]["algo"] == 1:
-          
+        if frameManager.checkPast(1) == True:
+            prev = frameManager.getPast(1)
+            combination = []
+            for id, person in enumerate(current):
+                combination.append([])
+                for prevId, prevPerson in enumerate(prev):
+                    combination[id].append((prevPerson["id"], rr.distance(person["center"], prevPerson["center"])))
+                if len(person) > len(prev):
+                    for i in range(len(person) - len(prev)):
+                        combination[id].append((-1,0))
+                combination[id].sort(key=takeSecond)
+                print("combination")
+                print(combination[id])
+        else:
+            for id, person in enumerate(current):
+                person["id"] = id
+            frameManager.setCurrent(current)
 
-    
+    elif cfg["time_analysis"]["algo"] == 1:
+        for t in range(1, frameManager.size - 1):
+            snapshot = frameManager.getPast(t)
+
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
     fileName += 1
