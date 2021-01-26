@@ -93,24 +93,29 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
     frameManager.add(frame)
     frame = []
     current = frameManager.getCurrent()
-    # if frameManager.checkPast(1) == True:
-    #     prev = frameManager.getPast(1)
-    #     combination = []
-    #     for id, person in enumerate(current):
-    #         combination.append([])
-    #         for prevId, prevPerson in enumerate(prev):
-    #             combination[id].append((prevPerson["id"], rr.distance(person["center"], prevPerson["center"])))
-    #         if len(person) > len(prev):
-    #             for i in range(len(person) - len(prev)):
-    #                 combination[id].append((-1,0))
-    #         combination[id].sort(key=takeSecond)
-    #         print("combination")
-    #         print(combination[id])
+
+    if cfg["time_analysis"]["algo"] == 0:
+        # if frameManager.checkPast(1) == True:
+        #     prev = frameManager.getPast(1)
+        #     combination = []
+        #     for id, person in enumerate(current):
+        #         combination.append([])
+        #         for prevId, prevPerson in enumerate(prev):
+        #             combination[id].append((prevPerson["id"], rr.distance(person["center"], prevPerson["center"])))
+        #         if len(person) > len(prev):
+        #             for i in range(len(person) - len(prev)):
+        #                 combination[id].append((-1,0))
+        #         combination[id].sort(key=takeSecond)
+        #         print("combination")
+        #         print(combination[id])
+            
+        # else:
+        #     for id, person in enumerate(current):
+        #         person["id"] = id
+        #     frameManager.setCurrent(current)
+    else if cfg["time_analysis"]["algo"] == 1:
         
-    # else:
-    #     for id, person in enumerate(current):
-    #         person["id"] = id
-    #     frameManager.setCurrent(current)
+    
     
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
