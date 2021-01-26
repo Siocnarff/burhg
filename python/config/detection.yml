@@ -5,12 +5,12 @@ bunch:
 ai_api:
   path: "http://localhost:81/v1/vision/detection"
   confidence: 0.2
-  recheck_confidence: 0.5
+  recheck_confidence: 0.2
 
 trigger:
-  single_frame: 0.90
+  single_frame: 0.85
 
 time_analysis:
   algo: 1
-  length: 5
+  length: 10
   max_jump: 1000

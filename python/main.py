@@ -56,23 +56,30 @@ def draw(image, objects):
         colour = Switch({
             range(20, 55): "#12d900",
             range(55, 75): "#fff700",
-            range(75, 90): "#fcb500",
-            range(90, 101): "#ff0000"
+            range(75, int(100*cfg["trigger"]["single_frame"])): "#fcb500",
+            range(int(100*cfg["trigger"]["single_frame"]), 101): "#ff0000"
         })
-        confidence = int(object["confidence"]*100)
+        confidence = 0
         shape = [(object["x_min"], object["y_min"]), (object["x_max"], object["y_max"])]
-        textBack = [(object["x_min"], object["y_min"] - 20),(object["x_min"] + len("person")*11, object["y_min"] - 2)]
-        # idBack = [(object["center"][0]-10,object["center"][1]-10),(object["center"][0]+10,object["center"][1]+10)]
-        confidenceBack = [(object["x_min"], object["y_min"] - 40),(object["x_min"] + len(str(object["confidence"]))*11, object["y_min"] - 20)]
+        confidenceBack = [(object["x_min"], object["y_min"] - 20),(object["x_min"] + len(str(object["confidence"]))*11, object["y_min"] - 2)]
         img1 = ImageDraw.Draw(image)   
         font = ImageFont.truetype("arial.ttf", 22)
         font2 = ImageFont.truetype("arial.ttf", 20)
-        img1.rectangle(textBack, fill="#000000", outline="#000000", width=5)
-        # img1.rectangle(idBack, fill="#000000", outline="#000000", width=5)
         img1.rectangle(confidenceBack, fill="#000000", outline="#000000", width=5)
-        img1.text((object["x_min"], object["y_min"] - 25), "person", (255,255,255), font=font)
-        img1.text((object["x_min"], object["y_min"] - 42), str(object["confidence"]), (255,255,255), font=font2)
-        # img1.text((object["center"][0]-8, object["center"][1]-12), str(object["id"]), (255,255,255), font)
+        img1.text((object["x_min"], object["y_min"] - 22), str(object["confidence"]), (255,255,255), font=font2)
+        if cfg["time_analysis"]["algo"] == 0:
+            confidence = int(object["confidence"]*100)
+            idBack = [(object["center"][0]-10,object["center"][1]-10),(object["center"][0]+10,object["center"][1]+10)]
+            img1.rectangle(idBack, fill="#000000", outline="#000000", width=5)
+            img1.text((object["center"][0]-8, object["center"][1]-12), str(object["id"]), (255,255,255), font)
+        else:
+            confidence = int(object["d_confidence"]*100)
+            d_confidence_back = [(object["x_min"], object["y_min"] - 40),(object["x_min"] + len(str(object["d_confidence"]))*11, object["y_min"] - 20)]
+            is_repeat = [(object["x_min"], object["y_min"] - 60),(object["x_min"] + len(str(object["is_repeat"]))*11, object["y_min"] - 40)]
+            img1.rectangle(d_confidence_back, fill="#000000", outline="#000000", width=5)
+            img1.rectangle(is_repeat, fill="#000000", outline="#000000", width=5)
+            img1.text((object["x_min"], object["y_min"] - 42), str(object["d_confidence"]), (255,255,255), font=font2)
+            img1.text((object["x_min"], object["y_min"] - 62), str(object["is_repeat"]), (255,255,255), font=font2)
         img1.rectangle(shape, fill =None, outline =colour[confidence], width =5) 
 
 def takeSecond(elem):
@@ -80,6 +87,26 @@ def takeSecond(elem):
 
 def confidence(elem):
     return elem["confidence"]
+
+def differs(a, b):
+    return abs(a["center"][0] - b["center"][0]) > 20 or abs(a["center"][1] - b["center"][1]) > 20
+
+def is_repeat(person, frameManager):
+    t = 1
+    while(t < frameManager.size - 1):
+        for old_person in frameManager.getPast(t):
+            if not differs(person, old_person):
+                old_person["matched"] = True
+                person["is_repeat"] = True
+                return True
+        t += 1
+    return False
+
+def in_frame(person, frame):
+    for other_person in frame:
+        if not differs(other_person, person):
+            return True
+    return False
 
 folder = input("Folder In data To Read From: ")
 
@@ -121,12 +148,17 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
 
     elif cfg["time_analysis"]["algo"] == 1:
         for person in current:
-            person["matched"] = found = False
+            person["matched"] = person["is_repeat"] = person["is_old_repeat"] = found = False
+            person["d_confidence"] = person["confidence"]
+            if is_repeat(person, frameManager):
+                continue
             t = 1
             while(t < frameManager.size - 1 and not found):
                 for old_person in frameManager.getPast(t):
-                    if not old_person["matched"]:
-                        person["confidence"] = min(person["confidence"] + 0.3 * old_person["confidence"], 1)
+                    if not old_person["matched"] and not in_frame(old_person, current):
+                        person["d_confidence"] = min(
+                                person["d_confidence"] + (0.3 * old_person["d_confidence"]), 1
+                            )
                         old_person["matched"] = True
                         found = True
                         break
