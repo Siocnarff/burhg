@@ -113,9 +113,9 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
         #     for id, person in enumerate(current):
         #         person["id"] = id
         #     frameManager.setCurrent(current)
-    else if cfg["time_analysis"]["algo"] == 1:
-        
-    
+    elif cfg["time_analysis"]["algo"] == 1:
+          
+
     
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
