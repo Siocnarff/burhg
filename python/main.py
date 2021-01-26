@@ -89,7 +89,8 @@ def confidence(elem):
     return elem["confidence"]
 
 def differs(a, b):
-    return abs(a["center"][0] - b["center"][0]) > 20 or abs(a["center"][1] - b["center"][1]) > 20
+    m = cfg["algo1"]["min_move_gap"]
+    return abs(a["center"][0] - b["center"][0]) > m or abs(a["center"][1] - b["center"][1]) > m
 
 def is_repeat(person, frameManager):
     t = 1
@@ -107,6 +108,9 @@ def in_frame(person, frame):
         if not differs(other_person, person):
             return True
     return False
+
+def may_use(old_person):
+    return not (old_person["matched"] or old_person["is_old_repeat"])
 
 folder = input("Folder In data To Read From: ")
 
@@ -155,14 +159,19 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
             t = 1
             while(t < frameManager.size - 1 and not found):
                 for old_person in frameManager.getPast(t):
-                    if not old_person["matched"] and not in_frame(old_person, current):
+                    if may_use(old_person) and not in_frame(old_person, current):
                         person["d_confidence"] = min(
-                                person["d_confidence"] + (0.3 * old_person["d_confidence"]), 1
+                                person["d_confidence"] + 
+                                (cfg["algo1"]["prev_frame_weight"] * old_person["d_confidence"]), 1
                             )
                         old_person["matched"] = True
                         found = True
                         break
                 t += 1
+        if frameManager.checkPast(1):
+            for old_person in frameManager.getPast(1):
+                if old_person["is_repeat"]:
+                    old_person["is_old_repeat"] = True
 
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))

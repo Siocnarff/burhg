@@ -13,4 +13,11 @@ trigger:
 time_analysis:
   algo: 1
   length: 10
+
+algo0:
   max_jump: 1000
+
+algo1:
+  min_move_gap: 15
+  prev_frame_weight: 0.4
+
