@@ -95,8 +95,10 @@ fileName = 0
 frame = []
 while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", frame):
     image = Image.open("media/data/" + folder + "/" + str(fileName) + ".jpg").convert("RGB")
-    frameManager.add(sorted(frame, key=confidence))
-    current = frameManager.getCurrent()
+    
+    current = sorted(frame, reverse=True, key=confidence)
+    frame = []
+    frameManager.add(current)
 
     if cfg["time_analysis"]["algo"] == 0:
         if frameManager.checkPast(1) == True:
@@ -118,8 +120,17 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
             frameManager.setCurrent(current)
 
     elif cfg["time_analysis"]["algo"] == 1:
-        for t in range(1, frameManager.size - 1):
-            snapshot = frameManager.getPast(t)
+        for person in current:
+            person["matched"] = found = False
+            t = 1
+            while(t < frameManager.size - 1 and not found):
+                for old_person in frameManager.getPast(t):
+                    if not old_person["matched"]:
+                        person["confidence"] = min(person["confidence"] + 0.3 * old_person["confidence"], 1)
+                        old_person["matched"] = True
+                        found = True
+                        break
+                t += 1
 
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
