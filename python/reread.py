@@ -211,5 +211,4 @@ def analyzeFrame(imagePath, imageName, frame):
         i += 1
 
     # labeledImage.save("{}labaledImage_{}".format(out,imageName))
-    print("====================FIN====================\n")
     return True
