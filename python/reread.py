@@ -78,7 +78,7 @@ def findBunch(arr, current, objects, i, bunch=False):
         and distance(centerabs(o), centerabs(objects[current])) > cfg["bunch"]["min_gap"]:
             bunch = findBunch(arr, index, objects, i, bunch)
         index += 1
-    if objects[current]["confidence"] < 0.60 and objects[current]["label"] == "person":
+    if objects[current]["confidence"] < cfg["reread"]["threshold"] and objects[current]["label"] == "person":
         bunch = True
     return bunch
 
@@ -198,8 +198,7 @@ def analyzeFrame(imagePath, imageName, frame):
 
         if not(object["loner"]) and object["label"] == "person":
             # mark(labeledImage, object, {"x_min":0, "x_max":labeledImage.width, "y_min":0, "y_max":labeledImage.height}, label, "#43eb34")
-            if object["confidence"] < 0.8:
-                recheck(cropped, cropObj(object, 0.5), frame)
+            recheck(cropped, cropObj(object, 0.5), frame)
         else:
             if object["label"] == "person":
                 frame.append({"center":centerabs(object), "x_min":object["x_min"], "x_max":object["x_max"], "y_min":object["y_min"], "y_max":object["y_max"], "confidence":object["confidence"]})

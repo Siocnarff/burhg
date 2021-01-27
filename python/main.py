@@ -92,25 +92,28 @@ def differs(a, b):
     m = cfg["algo1"]["min_move_gap"]
     return abs(a["center"][0] - b["center"][0]) > m or abs(a["center"][1] - b["center"][1]) > m
 
+def close_enough(a, b):
+    d = cfg["algo1"]["close_enough_gap"]
+    return abs(a["center"][0] - b["center"][0]) < d or abs(a["center"][1] - b["center"][1]) < d
+
 def is_repeat(person, frameManager):
     t = 1
     while(t < frameManager.size - 1):
         for old_person in frameManager.getPast(t):
             if not differs(person, old_person):
-                old_person["matched"] = True
-                person["is_repeat"] = True
+                old_person["matched"] = person["is_repeat"] = True
                 return True
+            if close_enough(person, old_person):
+                return False
         t += 1
     return False
 
-def in_frame(person, frame):
-    for other_person in frame:
-        if not differs(other_person, person):
-            return True
-    return False
-
-def may_use(old_person):
-    return not (old_person["matched"] or old_person["is_old_repeat"])
+# def in_frame(person, frame):
+#     for other_person in frame:
+#         if not differs(other_person, person):
+#             other_person["matched"] = True
+#             return True
+#     return False
 
 folder = input("Folder In data To Read From: ")
 
@@ -152,26 +155,33 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
 
     elif cfg["time_analysis"]["algo"] == 1:
         for person in current:
-            person["matched"] = person["is_repeat"] = person["is_old_repeat"] = found = False
+            person["matched"] = person["is_repeat"] = False
             person["d_confidence"] = person["confidence"]
-            if is_repeat(person, frameManager):
-                continue
+            is_repeat(person, frameManager)
+        for person in current:
             t = 1
+            found = False
+            if person["is_repeat"]:
+                print(f"Skip person: {person['confidence']}, {person['d_confidence']}")
+                continue
             while(t < frameManager.size - 1 and not found):
                 for old_person in frameManager.getPast(t):
-                    if may_use(old_person) and not in_frame(old_person, current):
+                    if not old_person["matched"]:
+                        print(f"Match at {t} : {old_person['confidence']}, {old_person['d_confidence']}")
                         person["d_confidence"] = min(
                                 person["d_confidence"] + 
-                                (cfg["algo1"]["prev_frame_weight"] * old_person["d_confidence"]), 1
+                                (cfg["algo1"]["prev_frame_weight"] * old_person["confidence"]), 1
                             )
                         old_person["matched"] = True
                         found = True
                         break
+                    else:
+                        print("IS MATCHED")
                 t += 1
-        if frameManager.checkPast(1):
-            for old_person in frameManager.getPast(1):
-                if old_person["is_repeat"]:
-                    old_person["is_old_repeat"] = True
+        # if frameManager.checkPast(1):
+        #     for old_person in frameManager.getPast(1):
+        #         if old_person["is_repeat"]:
+        #             old_person["old_repeat"] = True
 
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
