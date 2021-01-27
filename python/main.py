@@ -43,7 +43,6 @@ class FrameManager:
         return self.frames[index] is not None
 
     def getPast(self, num):
-        print("Num is: " + str(num))
         if num >= self.length - 1:
             raise Exception("Trying to access too far back")
         index = (self.index - num) % self.length
@@ -179,9 +178,7 @@ frame = []
 while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", frame):
     image = Image.open("media/data/" + folder + "/" + str(fileName) + ".jpg").convert("RGB")
     
-    current = sorted(frame, reverse=True, key=confidence)
-
-    frameManager.add(copy.deepcopy(frame))
+    current = sorted(copy.deepcopy(frame), reverse=True, key=confidence)
     frame = []
     frameManager.add(current)
 

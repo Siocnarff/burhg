@@ -14,8 +14,8 @@ trigger:
   single_frame: 0.85
 
 time_analysis:
-  algo: 1
-  length: 10
+  algo: 0
+  length: 6
 
 algo0:
   max_jump: 1000

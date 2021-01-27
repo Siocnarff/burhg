@@ -4,8 +4,17 @@ from imutils import contours
 from skimage import measure
 import argparse
 import imutils
+import os
 
-cap = cv2.VideoCapture('media/videos/1_3.mp4')
+file_name = input("File In Videos To Read From: ")
+
+try: 
+    if not os.path.exists(f'media/out/{file_name}'): 
+        os.makedirs(f'media/out/{file_name}') 
+except OSError: 
+    print ('Error: Creating directory for out')
+
+cap = cv2.VideoCapture(f'media/videos/{file_name}.mp4')
 
 fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
@@ -24,8 +33,9 @@ while(1):
     #print(type(fgmask))
 
     if index % 15 == 0:
+        print(".")
         fgmask = cv2.erode(fgmask, None, iterations=2)
-        fgmask = cv2.dilate(fgmask, None, iterations=4)
+        #fgmask = cv2.dilate(fgmask, None, iterations=1)
         labels = measure.label(fgmask, background=0)
         mask = np.zeros(fgmask.shape, dtype="uint8")
 
@@ -38,7 +48,16 @@ while(1):
 
             if numPixels > 300:
                 mask = cv2.add(mask, labelMask)
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        if len(cnts) == 0:
+            index += 1
+            continue
+        cnts = contours.sort_contours(cnts)[0]
 
+        for i, c in enumerate(cnts):
+            (x, y, w, h) = cv2.boundingRect(c)
+            mask = cv2.rectangle(mask, (x,y), (x+w,y+h), (255,255,255), 3)
         cv2.imwrite(f'media/out/1_3/{photo_index}.jpg',mask)
         photo_index += 1
     index += 1
