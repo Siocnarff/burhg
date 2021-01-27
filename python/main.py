@@ -2,6 +2,8 @@ import reread as rr
 import os
 import yaml
 from PIL import Image, ImageDraw, ImageFont
+import time
+import copy
 
 with open("config/detection.yml", "r") as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -41,10 +43,13 @@ class FrameManager:
         return self.frames[index] is not None
 
     def getPast(self, num):
+        print("Num is: " + str(num))
+        if num >= self.length - 1:
+            raise Exception("Trying to access too far back")
         index = (self.index - num) % self.length
         if self.frames[index] is None:
             raise Exception("No frame at current index")
-        return self.frames[index]
+        return copy.deepcopy(self.frames[index])
 
     def setCurrent(self, frame):
         self.frames[self.index] = frame
@@ -115,6 +120,50 @@ def is_repeat(person, frameManager):
 #             return True
 #     return False
 
+def get_max(frame):
+    max = -1
+    for person in frame:
+        if person["id"] > max:
+            max = person["id"]
+    return max
+
+def different(choices):
+    arr = sorted(choices)
+    prev = -1
+    for key in arr:
+        if key == prev:
+            return key
+        prev = key
+    return -1
+
+def find_optimal(comb):
+    choices = []
+    for i,c in enumerate(comb):
+        choices.append(c[0][0])
+    flag = different(choices)
+    while flag != -1:
+        min_index = [0,0]
+        min_cost = 100000
+        for i,c in enumerate(choices):
+            if flag == c:
+                index = [ x[0] for x in comb[i] ].index(flag)
+                if index < len(comb[i])-1:
+                    if comb[i][index + 1][1] - comb[i][index][1] < min_cost:
+                        # print("Cost is cheaper")
+                        min_cost = comb[i][index + 1][1] - comb[i][index][1]
+                        min_index[0] = i
+                        min_index[1] = index + 1
+                        # print("Person " + str(i) + " and index of tuple " + str(index + 1))
+        if min_cost == 100000:
+            raise Exception("No possible choice for different previous id's")
+        choices[min_index[0]] = comb[min_index[0]][min_index[1]][0]
+        # print("Checking if choices are different")
+        # print(choices)
+        # time.sleep(0.5)
+        flag = different(choices)
+    return choices
+        
+    
 folder = input("Folder In data To Read From: ")
 
 try: 
@@ -131,23 +180,41 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
     image = Image.open("media/data/" + folder + "/" + str(fileName) + ".jpg").convert("RGB")
     
     current = sorted(frame, reverse=True, key=confidence)
+
+    frameManager.add(copy.deepcopy(frame))
     frame = []
     frameManager.add(current)
 
     if cfg["time_analysis"]["algo"] == 0:
         if frameManager.checkPast(1) == True:
             prev = frameManager.getPast(1)
+            print("Previous frame: ")
+            print(prev)
+            for i in range(2,5):
+                if frameManager.checkPast(i) == True:
+                    prev_prev = frameManager.getPast(i)
+                    print("Two frames back")
+                    print(prev_prev)
+                    prev_set = set()
+                    prev_set.update([person["id"] for person in prev])
+                    for person in prev_prev:
+                        if person["id"] not in prev_set:
+                            prev.append(person)
+            max_id = get_max(prev)
             combination = []
             for id, person in enumerate(current):
                 combination.append([])
                 for prevId, prevPerson in enumerate(prev):
                     combination[id].append((prevPerson["id"], rr.distance(person["center"], prevPerson["center"])))
-                if len(person) > len(prev):
-                    for i in range(len(person) - len(prev)):
-                        combination[id].append((-1,0))
+                if len(current) > len(prev):
+                    for i in range(len(current) - len(prev)):
+                        combination[id].append((max_id + i + 1,0))
                 combination[id].sort(key=takeSecond)
                 print("combination")
                 print(combination[id])
+            ids = find_optimal(combination)
+            for i,person in enumerate(current):
+                person["id"] = ids[i]
         else:
             for id, person in enumerate(current):
                 person["id"] = id
@@ -186,3 +253,5 @@ while rr.analyzeFrame("media/data/" + folder + "/", str(fileName) + ".jpg", fram
     draw(image, current)
     image.save("{}labaledImage_{}".format("media/out/" + folder + "/",str(fileName) + ".jpg"))
     fileName += 1
+    print("====================I'LL BE BACK====================\n")
+print("====================FIN====================\n")
