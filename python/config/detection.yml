@@ -25,3 +25,5 @@ algo1:
   close_enough_gap: 30
   prev_frame_weight: 0.4
 
+crop:
+  size: 20
