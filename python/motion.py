@@ -151,12 +151,21 @@ class Tracker:
                 objs[index]["id"] = self.objects[key]["id"]
                 self.objects[key] = objs[index]
     
-    def get_max(self):
-        x_min = 10000
-        y_min = 10000
+    def get_max(self, extra_obj):
+        x_min = width
+        y_min = height
         x_max = 0
         y_max = 0
         for o in self.objects:
+            if x_min > o["x_min"]:
+                x_min = o["x_min"]
+            if y_min > o["y_min"]:
+                y_min = o["y_min"]
+            if x_max < o["x_max"]:
+                x_max = o["x_max"]
+            if y_max < o["y_max"]:
+                y_max = o["y_max"]
+        for o in extra_obj:
             if x_min > o["x_min"]:
                 x_min = o["x_min"]
             if y_min > o["y_min"]:
@@ -240,12 +249,12 @@ while(1):
             objects.append({"center":(cX,cY), "x_min":x, "y_min":y, "x_max":x+w, "y_max":y+h})
             mask = cv2.rectangle(mask, (x,y), (x+w,y+h), (255,255,255), 3)
             masked_data = cv2.rectangle(masked_data, (x,y), (x+w,y+h), (255,255,255), 3)
-        tracker.track(copy.deepcopy(objects))
-        #tracker.label(masked_data)
+        # tracker.track(copy.deepcopy(objects))
+        # tracker.label(masked_data)
 
-        size = tracker.get_max()
+        size = tracker.get_max(objects)
 
-        tracker.label(image)
+        
         crop_arr = calculateCrop(size, cfg["crop"]["size"])
         crop_obj = cropObj(size, cfg["crop"]["size"])
         image = cv2.rectangle(image, (int(crop_arr[0]),int(crop_arr[1])), (int(crop_arr[2]),int(crop_arr[3])), RGB((51,73,255)), 2)
@@ -266,11 +275,15 @@ while(1):
 
         image = np.array(image)
         other = [o for o in answer["predictions"] if o["label"] != "person"]
+        ai_obs = []
         for object in answer["predictions"]:
             if object["label"] == "person":
-                if same(object, other):
+                if object["confidence"] < cfg["trigger"]["single_frame"] and same(object, other):
                     continue
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
+                c_x = int(x_min + (x_max-x_min)/2)
+                c_y = int(y_min + (y_max-y_min)/2)
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max})
                 if object["confidence"] < 0.55:
                     colour = (18,217,0)
                 elif object["confidence"] < 0.75:
@@ -282,7 +295,14 @@ while(1):
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB(colour), 2)
             elif object["label"] == "dog":
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
+                c_x = int(x_min + (x_max-x_min)/2)
+                c_y = int(y_min + (y_max-y_min)/2)
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max})
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
+        
+        tracker.track(copy.deepcopy(ai_obs))
+        tracker.label(image)
+
 
         cv2.imwrite(f'media/out/{file_name}/labeled{photo_index}.jpg',image)
         #cv2.imwrite(f'media/out/1_3/masked{photo_index}.jpg',masked_data)
