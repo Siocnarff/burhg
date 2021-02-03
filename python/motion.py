@@ -57,41 +57,57 @@ def crop(image, object, sf):
 def take_id(elem):
     return elem["id"]
 
-def take_second(elem):
-    return elem[1]
+def take_first(elem):
+    return elem[0]
 
-def distance(x, y):
+def weight(x, y):
     if "placeholder" in x or "placeholder" in y:
         return 0
     dist = math.sqrt((x["center"][0]-y["center"][0])**2 + (x["center"][1]-y["center"][1])**2)
     if dist > 300:
         return 1000
+    x_shape = [x["x_max"]-x["x_min"], x["y_max"]-x["y_min"]]
+    y_shape = [y["x_max"]-y["x_min"], y["y_max"]-y["y_min"]]
+    x_area = x_shape[0]*x_shape[1]
+    y_area = y_shape[0]*y_shape[1]
+    area = abs(x_area-y_area)/50
+    x_ratio = x_shape[0]/x_shape[1]
+    y_ratio = y_shape[0]/y_shape[1]
+    ratio = abs(x_ratio-y_ratio)*300
+    print(f"Area weight: {area}, ratio weight: {ratio}")
+    dist += area + ratio
     return dist
 
 def different(choices):
     arr = sorted(choices)
-    prev = -1
+    prev = None
     for key in arr:
         if key == prev:
             return key
         prev = key
-    return -1
+    return None
 
 def calculate_min_comb(existing_objects, new_objects):
     pointer = []
     for i, new_obj in enumerate(new_objects):
         pointer.append([])
         for j, old_obj in enumerate(existing_objects):
-            pointer[i].append((distance(new_obj, old_obj), j))
-        pointer[i].sort(key=take_second)
+            pointer[i].append((weight(new_obj, old_obj), j))
+        pointer[i].sort(key=take_first)
     choices = [o[0][1] for o in pointer]
     flag = different(choices)
-    while flag != -1:
+    print("Corresponding id's: ", end="")
+    print([o["id"] for o in existing_objects])
+    print("Pointer array is: ")
+    for index,row in enumerate(pointer):
+        print(f"ID {index}: ",end="")
+        print(row)
+    while flag != None:
         min_index = [0,0]
         min_cost = 10000000
         for i,c in enumerate(choices):
             if flag == c:
-                index = [ x[1] for x in pointer[i] ].index(flag)
+                index = [x[1] for x in pointer[i]].index(flag)
                 if index < len(pointer[i])-1:
                     if pointer[i][index + 1][0] - pointer[i][index][0] < min_cost:
                         min_cost = pointer[i][index + 1][0] - pointer[i][index][0]
@@ -101,6 +117,19 @@ def calculate_min_comb(existing_objects, new_objects):
             raise Exception("No possible choice for different previous id's")
         choices[min_index[0]] = pointer[min_index[0]][min_index[1]][1]
         flag = different(choices)
+    for loop in range(int(len(choices)/2)):
+        for first, id in enumerate(choices):
+            for second in range(first+1,len(choices)):
+                index = [x[1] for x in pointer[first]].index(id)
+                index_2 = [x[1] for x in pointer[second]].index(choices[second])
+                current_weight = pointer[first][index][0] + pointer[second][index_2][0]
+                index = [x[1] for x in pointer[first]].index(choices[second])
+                index_2 = [x[1] for x in pointer[second]].index(id)
+                swopped_weight = pointer[first][index][0] + pointer[second][index_2][0]
+                if current_weight > swopped_weight:
+                    temp = id
+                    choices[first] = choices[second]
+                    choices[second] = temp
     return choices
 
 def calculatePos(object, size):
@@ -117,8 +146,13 @@ class Tracker:
     objects = []
 
     def label(self, image):
+        if photo_index == 334:
+            print("Objects in tracker: ")
+            print(self.objects)
         for o in self.objects:
-            image = cv2.putText(image, str(o["id"]), o["center"], cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2, cv2.LINE_AA) 
+            c_x = o["center"][0]
+            c_y = o["center"][1]
+            image = cv2.putText(image, str(o["id"]), (c_x-10,c_y-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2, cv2.LINE_AA) 
 
     def replace(self, object, index):
         new_id = 0
@@ -278,7 +312,7 @@ while(1):
         ai_obs = []
         for object in answer["predictions"]:
             if object["label"] == "person":
-                if object["confidence"] < cfg["trigger"]["single_frame"] and same(object, other):
+                if object["confidence"] < 0.5 and same(object, other):
                     continue
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
