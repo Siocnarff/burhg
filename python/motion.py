@@ -76,6 +76,10 @@ def weight(x, y):
     ratio = abs(x_ratio-y_ratio)*300
     print(f"Area weight: {area}, ratio weight: {ratio}")
     dist += area + ratio
+    if x["label"] == y["label"]:
+        dist *= 0.75
+    else:
+        dist *= 1.25
     return dist
 
 def different(choices):
@@ -146,7 +150,7 @@ class Tracker:
     objects = []
 
     def label(self, image):
-        if photo_index == 334:
+        if photo_index == 334 or photo_index == 147 or photo_index == 148:
             print("Objects in tracker: ")
             print(self.objects)
         for o in self.objects:
@@ -176,6 +180,10 @@ class Tracker:
             for i in range(len(objs) - len(self.objects)):
                 self.objects.append({"placeholder":True, "id":-(i+1)})
         comb = calculate_min_comb(self.objects, objs)
+        # print("Self objects are: ", end="")
+        # print(self.objects)
+        # print("Objs are: ", end="")
+        # print(objs)
         for index, key in enumerate(comb):
             if "placeholder" in objs[index]:
                 self.objects.remove(self.objects[key])
@@ -317,7 +325,7 @@ while(1):
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max})
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":object["label"]})
                 if object["confidence"] < 0.55:
                     colour = (18,217,0)
                 elif object["confidence"] < 0.75:
@@ -331,7 +339,7 @@ while(1):
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max})
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog"})
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
         
         tracker.track(copy.deepcopy(ai_obs))
