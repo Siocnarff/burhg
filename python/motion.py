@@ -121,6 +121,9 @@ def calculate_min_comb(existing_objects, new_objects):
             raise Exception("No possible choice for different previous id's")
         choices[min_index[0]] = pointer[min_index[0]][min_index[1]][1]
         flag = different(choices)
+    # print("combination at this stage is: ", end="")
+    # print(choices)
+    # print("==================")
     for loop in range(int(len(choices)/2)):
         for first, id in enumerate(choices):
             for second in range(first+1,len(choices)):
@@ -131,9 +134,15 @@ def calculate_min_comb(existing_objects, new_objects):
                 index_2 = [x[1] for x in pointer[second]].index(id)
                 swopped_weight = pointer[first][index][0] + pointer[second][index_2][0]
                 if current_weight > swopped_weight:
-                    temp = id
+                    # print("Array is: ", end="")
+                    # print(choices)
+                    # print(f"Swopping {first} with {second}")
+                    temp = choices[first]
                     choices[first] = choices[second]
                     choices[second] = temp
+    #                 print("Array is: ", end="")
+    #                 print(choices)
+    # print("==================")
     return choices
 
 def calculatePos(object, size):
@@ -150,9 +159,9 @@ class Tracker:
     objects = []
 
     def label(self, image):
-        if photo_index == 334 or photo_index == 147 or photo_index == 148:
-            print("Objects in tracker: ")
-            print(self.objects)
+        # if photo_index == 334 or photo_index == 147 or photo_index == 148:
+        #     print("Objects in tracker: ")
+        #     print(self.objects)
         for o in self.objects:
             c_x = o["center"][0]
             c_y = o["center"][1]
@@ -184,14 +193,38 @@ class Tracker:
         # print(self.objects)
         # print("Objs are: ", end="")
         # print(objs)
+        # print("Combination chosen is: ", end="")
+        # print(comb)
         for index, key in enumerate(comb):
+            # if photo_index > 58:
+            #     print("----------------------")
+            #     print(f"Looking at index: {key}")
+            #     print("placeholder" in self.objects[key])
             if "placeholder" in objs[index]:
+                # if photo_index > 58:
+                #     print("Objects before removing old object: ", end="")
+                #     print(self.objects)
                 self.objects.remove(self.objects[key])
+                # if photo_index > 58:
+                #     print("Objects after removing old object: ", end="")
+                #     print(self.objects)
             elif "placeholder" in self.objects[key]:
+                # if photo_index > 58:
+                #     print("Objects before replacing placeholder object with new one: ", end="")
+                #     print(self.objects)
                 self.replace(objs[index], key)
+                # if photo_index > 58:
+                #     print("Objects after replacing placeholder object with new one: ", end="")
+                #     print(self.objects)
             else:
+                # if photo_index > 58:
+                #     print("Objects before replacing old object with new one: ", end="")
+                #     print(self.objects)
                 objs[index]["id"] = self.objects[key]["id"]
                 self.objects[key] = objs[index]
+                # if photo_index > 58:
+                #     print("Objects after replacing old object with new one: ", end="")
+                #     print(self.objects)
     
     def get_max(self, extra_obj):
         x_min = width
