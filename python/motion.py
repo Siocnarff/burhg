@@ -13,6 +13,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 import io
 import time
+import sys
 
 with open("config/detection.yml", "r") as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -63,7 +64,9 @@ def take_first(elem):
 def weight(x, y):
     if "placeholder" in x or "placeholder" in y:
         return 0
-    dist = math.sqrt((x["center"][0]-y["center"][0])**2 + (x["center"][1]-y["center"][1])**2)
+    x1 = x["center"][0]-y["center"][0] - y["direction"][0]
+    x2 = x["center"][1]-y["center"][1] - y["direction"][1]
+    dist = math.sqrt((x1)**2 + (x2)**2)
     if dist > 300:
         return 1000
     x_shape = [x["x_max"]-x["x_min"], x["y_max"]-x["y_min"]]
@@ -74,10 +77,13 @@ def weight(x, y):
     x_ratio = x_shape[0]/x_shape[1]
     y_ratio = y_shape[0]/y_shape[1]
     ratio = abs(x_ratio-y_ratio)*300
-    print(f"Area weight: {area}, ratio weight: {ratio}")
+    # print(f"Area weight: {area}, ratio weight: {ratio}")
     dist += area + ratio
     if x["label"] == y["label"]:
-        dist *= 0.75
+        if abs(x["confidence"] - y["confidence"]) < 0.30:
+            dist *= 0.6
+        else:
+            dist *= 0.9
     else:
         dist *= 1.25
     return dist
@@ -100,12 +106,12 @@ def calculate_min_comb(existing_objects, new_objects):
         pointer[i].sort(key=take_first)
     choices = [o[0][1] for o in pointer]
     flag = different(choices)
-    print("Corresponding id's: ", end="")
-    print([o["id"] for o in existing_objects])
-    print("Pointer array is: ")
-    for index,row in enumerate(pointer):
-        print(f"ID {index}: ",end="")
-        print(row)
+    # print("Corresponding id's: ", end="")
+    # print([o["id"] for o in existing_objects])
+    # print("Pointer array is: ")
+    # for index,row in enumerate(pointer):
+    #     print(f"ID {index}: ",end="")
+    #     print(row)
     while flag != None:
         min_index = [0,0]
         min_cost = 10000000
@@ -160,12 +166,14 @@ class Tracker:
 
     def label(self, image):
         # if photo_index == 334 or photo_index == 147 or photo_index == 148:
-        #     print("Objects in tracker: ")
-        #     print(self.objects)
+        # print("Objects in tracker: ")
+        # for o in self.objects:
+        #     print(o)
+        # print("-------------")
         for o in self.objects:
             c_x = o["center"][0]
             c_y = o["center"][1]
-            image = cv2.putText(image, str(o["id"]), (c_x-10,c_y-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2, cv2.LINE_AA) 
+            image = cv2.putText(image, str(o["id"]), (c_x-10,c_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2, cv2.LINE_AA) 
 
     def replace(self, object, index):
         new_id = 0
@@ -189,42 +197,18 @@ class Tracker:
             for i in range(len(objs) - len(self.objects)):
                 self.objects.append({"placeholder":True, "id":-(i+1)})
         comb = calculate_min_comb(self.objects, objs)
-        # print("Self objects are: ", end="")
-        # print(self.objects)
-        # print("Objs are: ", end="")
-        # print(objs)
-        # print("Combination chosen is: ", end="")
-        # print(comb)
         for index, key in enumerate(comb):
-            # if photo_index > 58:
-            #     print("----------------------")
-            #     print(f"Looking at index: {key}")
-            #     print("placeholder" in self.objects[key])
             if "placeholder" in objs[index]:
-                # if photo_index > 58:
-                #     print("Objects before removing old object: ", end="")
-                #     print(self.objects)
                 self.objects.remove(self.objects[key])
-                # if photo_index > 58:
-                #     print("Objects after removing old object: ", end="")
-                #     print(self.objects)
             elif "placeholder" in self.objects[key]:
-                # if photo_index > 58:
-                #     print("Objects before replacing placeholder object with new one: ", end="")
-                #     print(self.objects)
+                objs[index]["direction"] = [0,0]
                 self.replace(objs[index], key)
-                # if photo_index > 58:
-                #     print("Objects after replacing placeholder object with new one: ", end="")
-                #     print(self.objects)
             else:
-                # if photo_index > 58:
-                #     print("Objects before replacing old object with new one: ", end="")
-                #     print(self.objects)
                 objs[index]["id"] = self.objects[key]["id"]
+                delta_x = objs[index]["center"][0] - self.objects[key]["center"][0]
+                delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
+                objs[index]["direction"] = [delta_x, delta_y]
                 self.objects[key] = objs[index]
-                # if photo_index > 58:
-                #     print("Objects after replacing old object with new one: ", end="")
-                #     print(self.objects)
     
     def get_max(self, extra_obj):
         x_min = width
@@ -267,6 +251,7 @@ fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
 
 tracker = Tracker()
 
+
 index = 0
 photo_index = 0
 while(1):
@@ -307,7 +292,7 @@ while(1):
             if numPixels > 300:
                 mask = cv2.add(mask, labelMask)
         masked_data = cv2.bitwise_and(frame, frame, mask=mask)
-        #cv2.imwrite(f'media/out/1_3/masked{photo_index}.jpg',masked_data)
+        cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',masked_data)
         cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         if len(cnts) == 0:
@@ -343,13 +328,18 @@ while(1):
         img_crop.save(img_byte_arr, format='PNG')
         img_byte_arr = img_byte_arr.getvalue()
 
-        tic = time.perf_counter()
-        answer = requests.post(cfg["ai_api"]["path"],files={"image":img_byte_arr},data={"min_confidence":cfg["ai_api"]["confidence"]}).json()
-        toc = time.perf_counter()
-        print(f"Api call for {photo_index} was done in {toc - tic:0.4f} seconds")
+
+        try:
+            tic = time.perf_counter()
+            answer = requests.post(cfg["ai_api"]["path"],files={"image":img_byte_arr},data={"min_confidence":cfg["ai_api"]["confidence"]}).json()
+            toc = time.perf_counter()
+            print(f"Api call for {photo_index} was done in {toc - tic:0.4f} seconds")
+        except:
+            sys.exit("Restart Api")
 
         image = np.array(image)
         other = [o for o in answer["predictions"] if o["label"] != "person"]
+        persons = [o for o in answer["predictions"] if o["label"] == "person"]
         ai_obs = []
         for object in answer["predictions"]:
             if object["label"] == "person":
@@ -358,7 +348,7 @@ while(1):
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":object["label"]})
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":object["label"], "confidence":object["confidence"]})
                 if object["confidence"] < 0.55:
                     colour = (18,217,0)
                 elif object["confidence"] < 0.75:
@@ -369,10 +359,12 @@ while(1):
                     colour = (255,0,0)
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB(colour), 2)
             elif object["label"] == "dog":
+                if same(object, persons):
+                    continue
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog"})
+                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog", "confidence":object["confidence"]})
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
         
         tracker.track(copy.deepcopy(ai_obs))
