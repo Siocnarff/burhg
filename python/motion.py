@@ -173,7 +173,11 @@ class Tracker:
         for o in self.objects:
             c_x = o["center"][0]
             c_y = o["center"][1]
-            image = cv2.putText(image, str(o["id"]), (c_x-10,c_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2, cv2.LINE_AA) 
+            if o["history"] == 0:
+                colour = (255,0,0)
+            else:
+                colour = (255,255,255)
+            image = cv2.putText(image, str(o["id"]), (c_x-10,c_y), cv2.FONT_HERSHEY_SIMPLEX, 1, colour, 2, cv2.LINE_AA) 
 
     def replace(self, object, index):
         new_id = 0
@@ -202,7 +206,11 @@ class Tracker:
         to_remove = []
         for index, key in enumerate(comb):
             if "placeholder" in objs[index]:
-                to_remove.append(self.objects[key])
+                if self.objects[key]["history"] == 1:
+                    to_remove.append(self.objects[key])
+                self.objects[key]["history"] += 1
+                self.objects[key]["center"][0] += self.objects[key]["direction"][0]
+                self.objects[key]["center"][1] += self.objects[key]["direction"][1]
             elif "placeholder" in self.objects[key]:
                 objs[index]["direction"] = [0,0]
                 self.replace(objs[index], key)
@@ -212,6 +220,7 @@ class Tracker:
                 delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
                 objs[index]["direction"] = [delta_x, delta_y]
                 self.objects[key] = objs[index]
+                self.objects[key]["history"] = 0
         for obj in to_remove:
             self.objects.remove(obj)
     
@@ -281,7 +290,7 @@ while(1):
         print(".")
         ret1,fgmask = cv2.threshold(fgmask,240,255,cv2.THRESH_BINARY)
         fgmask = cv2.bitwise_and(fgmask, background_mask)
-        cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',fgmask)
+        #cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',fgmask)
         fgmask = cv2.erode(fgmask, None, iterations=2)
         #blur = cv2.GaussianBlur(fgmask,(5,5),0)
         #blur = cv2.blur(fgmask,(10,10))
@@ -357,7 +366,7 @@ while(1):
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":object["label"], "confidence":object["confidence"]})
+                ai_obs.append({"center":[c_x,c_y], "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":object["label"], "confidence":object["confidence"], "history":0})
                 if object["confidence"] < 0.55:
                     colour = (18,217,0)
                 elif object["confidence"] < 0.75:
@@ -373,7 +382,7 @@ while(1):
                 x_min, y_min, x_max, y_max = calculatePos(object, crop_obj)
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
-                ai_obs.append({"center":(c_x,c_y), "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog", "confidence":object["confidence"]})
+                ai_obs.append({"center":[c_x,c_y], "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog", "confidence":object["confidence"], "history":0})
                 image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
         
         tracker.track(copy.deepcopy(ai_obs))
