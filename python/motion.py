@@ -197,9 +197,12 @@ class Tracker:
             for i in range(len(objs) - len(self.objects)):
                 self.objects.append({"placeholder":True, "id":-(i+1)})
         comb = calculate_min_comb(self.objects, objs)
+        print("comb: ", end="")
+        print(comb)
+        to_remove = []
         for index, key in enumerate(comb):
             if "placeholder" in objs[index]:
-                self.objects.remove(self.objects[key])
+                to_remove.append(self.objects[key])
             elif "placeholder" in self.objects[key]:
                 objs[index]["direction"] = [0,0]
                 self.replace(objs[index], key)
@@ -209,6 +212,8 @@ class Tracker:
                 delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
                 objs[index]["direction"] = [delta_x, delta_y]
                 self.objects[key] = objs[index]
+        for obj in to_remove:
+            self.objects.remove(obj)
     
     def get_max(self, extra_obj):
         x_min = width
@@ -251,6 +256,8 @@ fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
 
 tracker = Tracker()
 
+background_mask = cv2.imread(f'media/videos/{file_name}mask.jpg', cv2.IMREAD_GRAYSCALE)
+
 
 index = 0
 photo_index = 0
@@ -273,6 +280,8 @@ while(1):
         height = image.shape[0]
         print(".")
         ret1,fgmask = cv2.threshold(fgmask,240,255,cv2.THRESH_BINARY)
+        fgmask = cv2.bitwise_and(fgmask, background_mask)
+        cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',fgmask)
         fgmask = cv2.erode(fgmask, None, iterations=2)
         #blur = cv2.GaussianBlur(fgmask,(5,5),0)
         #blur = cv2.blur(fgmask,(10,10))
@@ -292,7 +301,7 @@ while(1):
             if numPixels > 300:
                 mask = cv2.add(mask, labelMask)
         masked_data = cv2.bitwise_and(frame, frame, mask=mask)
-        cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',masked_data)
+        #cv2.imwrite(f'media/out/{file_name}/masked{photo_index}.jpg',masked_data)
         cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         if len(cnts) == 0:
