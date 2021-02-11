@@ -68,7 +68,7 @@ def weight(x, y):
     x2 = x["center"][1]-y["center"][1] - y["direction"][1]
     dist = math.sqrt((x1)**2 + (x2)**2)
     if dist > 300:
-        return 1000
+        dist += 10000
     x_shape = [x["x_max"]-x["x_min"], x["y_max"]-x["y_min"]]
     y_shape = [y["x_max"]-y["x_min"], y["y_max"]-y["y_min"]]
     x_area = x_shape[0]*x_shape[1]
@@ -158,11 +158,50 @@ def calculatePos(object, size):
     y_max = size["y_min"] + object["y_max"]
     return int(x_min), int(y_min), int(x_max), int(y_max)
 
+def check_match(existing, new, comb):
+    flag = -1
+    og_weight = 0
+    # print("Old: ", end="")
+    # print(existing)
+    # print("New: ", end="")
+    # print(new)
+    for index,key in enumerate(comb):
+        og_weight += weight(new[index],existing[key])
+    # print("og_weight: ", end="")
+    # print(og_weight)
+    temp = existing
+    difference = 0
+    best_comb = comb
+    for index,obj in enumerate(existing):
+        temp[index] = {"placeholder":True, "id":-1}
+        combination = calculate_min_comb(existing, new)
+        new_weight = 0
+        for index,key in enumerate(combination):
+            new_weight += weight(new[index],existing[key])
+        # print("New weight: ", end="")
+        # print(new_weight)
+        print("Difference: ", end="")
+        print(difference)
+        if og_weight - new_weight > difference:
+            difference = og_weight - new_weight
+            if difference > 3000:
+                print("Difference is big!!")
+                best_comb = combination
+                flag = index
+        temp[index] = obj
+    return flag, best_comb
+    
+
+
+
+
+
 def RGB(colour):
     return colour[::-1]
 
 class Tracker:
     objects = []
+    inside = 0
 
     def label(self, image):
         # if photo_index == 334 or photo_index == 147 or photo_index == 148:
@@ -170,6 +209,8 @@ class Tracker:
         # for o in self.objects:
         #     print(o)
         # print("-------------")
+        string = "In: " + str(self.inside)
+        image = cv2.putText(image, string, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA) 
         for o in self.objects:
             c_x = o["center"][0]
             c_y = o["center"][1]
@@ -203,8 +244,33 @@ class Tracker:
         comb = calculate_min_comb(self.objects, objs)
         print("comb: ", end="")
         print(comb)
+        flag = False
+        for o in self.objects:
+            if "placeholder" in o:
+                flag = True
+        for o in objs:
+            if "placeholder" in o:
+                flag = True
+        if not flag:
+            ret,combination = check_match(copy.deepcopy(self.objects), copy.deepcopy(objs), comb)
+            # print("Current comb: ", end="")
+            # print(comb)
+            # print("New combination: ", end="")
+            # print(combination)
+            if ret != -1:
+                self.objects[ret] = {"placeholder":True, "id":-1}
+                comb = combination
         to_remove = []
         for index, key in enumerate(comb):
+            if not "placeholder" in self.objects[key]:
+                if self.objects[key]["history"] == 1:
+                    c = (self.objects[key]["center"][0] - self.objects[key]["direction"][0], self.objects[key]["center"][1])
+                    print("Center of point is: ", end="")
+                    print(c)
+                    print("Inside? ", end="")
+                    print(cv2.pointPolygonTest(contour, c, False) == 1)
+                    if cv2.pointPolygonTest(contour, c, False) == 1 and self.objects[key]["direction"][0] < 0  and self.objects[key]["label"] == "person":
+                        self.inside += 1
             if "placeholder" in objs[index]:
                 if self.objects[key]["history"] == 1:
                     to_remove.append(self.objects[key])
@@ -219,6 +285,13 @@ class Tracker:
                 delta_x = objs[index]["center"][0] - self.objects[key]["center"][0]
                 delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
                 objs[index]["direction"] = [delta_x, delta_y]
+                if cv2.pointPolygonTest(contour, tuple(objs[index]["center"]), False) == -1 and objs[index]["label"] == "person":
+                    if cv2.pointPolygonTest(contour, tuple(self.objects[key]["center"]), False) == 1:
+                        c = (self.objects[key]["center"][0], self.objects[key]["center"][1])
+                    else:
+                        c = (self.objects[key]["center"][0]-delta_x*0.3, self.objects[key]["center"][1]-delta_y*0.3)
+                    if cv2.pointPolygonTest(contour, c, False) == 1:
+                        self.inside -= 1
                 self.objects[key] = objs[index]
                 self.objects[key]["history"] = 0
         for obj in to_remove:
@@ -264,8 +337,27 @@ cap = cv2.VideoCapture(f'media/videos/{file_name}.mp4')
 fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
 
 tracker = Tracker()
+tracker.inside = int(input("How many people are in the house? "))
 
 background_mask = cv2.imread(f'media/videos/{file_name}mask.jpg', cv2.IMREAD_GRAYSCALE)
+entrance = cv2.imread(f'media/videos/{file_name}door.jpg', cv2.IMREAD_GRAYSCALE)
+
+entrance_labels = measure.label(entrance, background=0)
+entrance_mask = np.zeros(entrance.shape, dtype="uint8")
+for entrance_label in np.unique(entrance_labels):
+    if entrance_label == 0:
+        continue
+    label_mask = np.zeros(entrance.shape, dtype="uint8")
+    label_mask[entrance_labels == entrance_label] = 255
+    numPixels = cv2.countNonZero(label_mask)
+    if numPixels > 500:
+        entrance_mask = cv2.add(entrance_mask, label_mask)
+    
+contour = cv2.findContours(entrance_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+contour = imutils.grab_contours(contour)
+contour = contours.sort_contours(contour)[0]
+contour = contour[0]
+#print(cv2.pointPolygonTest(contour, (100,500), False))
 
 
 index = 0
