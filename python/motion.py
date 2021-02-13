@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import time
 import sys
+import pdb
 
 with open("config/detection.yml", "r") as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -67,8 +68,7 @@ def weight(x, y):
     x1 = x["center"][0]-y["center"][0] - y["direction"][0]
     x2 = x["center"][1]-y["center"][1] - y["direction"][1]
     dist = math.sqrt((x1)**2 + (x2)**2)
-    if dist > 300:
-        dist += 10000
+    dist *= 5.3*(dist**0.1)
     x_shape = [x["x_max"]-x["x_min"], x["y_max"]-x["y_min"]]
     y_shape = [y["x_max"]-y["x_min"], y["y_max"]-y["y_min"]]
     x_area = x_shape[0]*x_shape[1]
@@ -92,60 +92,131 @@ def different(choices):
     arr = sorted(choices)
     prev = None
     for key in arr:
+        if key == -1:
+            continue
         if key == prev:
             return key
         prev = key
     return None
 
+def can_move(mover, victim):
+    move_distance = 200
+    diff = victim - mover
+    move_distance += diff
+    if move_distance < 0:
+        return 0
+    return move_distance
+
+
 def calculate_min_comb(existing_objects, new_objects):
+    # if photo_index == 69:
+    #     pdb.set_trace()
     pointer = []
+    if len(existing_objects) == 0:
+        return [-1 for i in range(len(new_objects))]
+    if len(new_objects) == 0:
+        return []
     for i, new_obj in enumerate(new_objects):
         pointer.append([])
         for j, old_obj in enumerate(existing_objects):
             pointer[i].append((weight(new_obj, old_obj), j))
         pointer[i].sort(key=take_first)
     choices = [o[0][1] for o in pointer]
+    # for index,w in enumerate(pointer):
+    #     print("weight: ", end="")
+    #     for i in w:
+    #         if "label" in new_objects[index]:
+    #             string = new_objects[index]["label"]
+    #         else:
+    #             string = "unknown"
+    #         print(f"Distance from {i[1]} is {i[0]} and my label is {string}")
+            # if i[0] != 0:
+            #     print(i[0])
+            #     print("Old id: ", end="")
+            #     print(i[1])
+            #     break
     flag = different(choices)
-    # print("Corresponding id's: ", end="")
-    # print([o["id"] for o in existing_objects])
-    # print("Pointer array is: ")
-    # for index,row in enumerate(pointer):
-    #     print(f"ID {index}: ",end="")
-    #     print(row)
+
     while flag != None:
-        min_index = [0,0]
-        min_cost = 10000000
-        for i,c in enumerate(choices):
-            if flag == c:
-                index = [x[1] for x in pointer[i]].index(flag)
-                if index < len(pointer[i])-1:
-                    if pointer[i][index + 1][0] - pointer[i][index][0] < min_cost:
-                        min_cost = pointer[i][index + 1][0] - pointer[i][index][0]
-                        min_index[0] = i
-                        min_index[1] = index + 1
-        if min_cost == 10000000:
-            raise Exception("No possible choice for different previous id's")
-        choices[min_index[0]] = pointer[min_index[0]][min_index[1]][1]
+        # min_index = [0,0]
+        # min_cost = 10000000
+        # for i,c in enumerate(choices):
+        #     if flag == c:
+        #         index = [x[1] for x in pointer[i]].index(flag)
+        #         if index < len(pointer[i])-1:
+        #             if pointer[i][index + 1][0] - pointer[i][index][0] < min_cost:
+        #                 min_cost = pointer[i][index + 1][0] - pointer[i][index][0]
+        #                 min_index[0] = i
+        #                 min_index[1] = index + 1
+        # if min_cost == 10000000:
+        #     raise Exception("No possible choice for different previous id's")
+        # choices[min_index[0]] = pointer[min_index[0]][min_index[1]][1]
+        best = None
+        second_best = None
+        for index,choice in enumerate(choices):
+            if flag == choice:
+                choice_index = [row[1] for row in pointer[index]].index(choice)
+                if best == None:
+                    best = pointer[index][choice_index][0]
+                    second_best = pointer[index][choice_index][0]
+                elif best > pointer[index][choice_index][0]:
+                    second_best = best
+                    best = pointer[index][choice_index][0]
+                elif second_best > pointer[index][choice_index][0]:
+                    second_best = pointer[index][choice_index][0]
+        min_cost = None
+        min_position = None
+        for index,choice in enumerate(choices):
+            if flag == choice:
+                choice_index = [row[1] for row in pointer[index]].index(choice)
+                if choice_index < len(pointer[index]) - 1:
+                    if best != pointer[index][choice_index][0]:
+                        if can_move(best, pointer[index][choice_index][0]) > pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]:
+                            if min_cost == None or min_cost > pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]:
+                                min_cost = pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]
+                                min_position = [index, choice_index + 1]
+                    else:
+                        if can_move(second_best, best) > pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]:
+                            if min_cost == None or min_cost > pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]:
+                                min_cost = pointer[index][choice_index + 1][0] - pointer[index][choice_index][0]
+                                min_position = [index, choice_index + 1]
+        if min_cost == None:
+            for index,choice in enumerate(choices):
+                if flag == choice:
+                    choice_index = [row[1] for row in pointer[index]].index(choice)
+                    if best != pointer[index][choice_index][0]:
+                        choices[index] = -1
+        else:
+            if min_cost > 8000:
+                choices[min_position[0]] = -1
+            else:
+                choices[min_position[0]] = pointer[min_position[0]][min_position[1]][1]
+
         flag = different(choices)
-    # print("combination at this stage is: ", end="")
-    # print(choices)
-    # print("==================")
-    for loop in range(int(len(choices)/2)):
-        for first, id in enumerate(choices):
-            for second in range(first+1,len(choices)):
-                index = [x[1] for x in pointer[first]].index(id)
-                index_2 = [x[1] for x in pointer[second]].index(choices[second])
-                current_weight = pointer[first][index][0] + pointer[second][index_2][0]
-                index = [x[1] for x in pointer[first]].index(choices[second])
-                index_2 = [x[1] for x in pointer[second]].index(id)
-                swopped_weight = pointer[first][index][0] + pointer[second][index_2][0]
-                if current_weight > swopped_weight:
-                    # print("Array is: ", end="")
-                    # print(choices)
-                    # print(f"Swopping {first} with {second}")
-                    temp = choices[first]
-                    choices[first] = choices[second]
-                    choices[second] = temp
+    
+    for index,choice in enumerate(choices):
+        if choice == -1:
+            continue
+        choice_index = [row[1] for row in pointer[index]].index(choice)
+        if pointer[index][choice_index][0] > 8000:
+            choices[index] = -1
+
+    # for loop in range(int(len(choices)/2)):
+    #     for first, id in enumerate(choices):
+    #         for second in range(first+1,len(choices)):
+    #             index = [x[1] for x in pointer[first]].index(id)
+    #             index_2 = [x[1] for x in pointer[second]].index(choices[second])
+    #             current_weight = pointer[first][index][0] + pointer[second][index_2][0]
+    #             index = [x[1] for x in pointer[first]].index(choices[second])
+    #             index_2 = [x[1] for x in pointer[second]].index(id)
+    #             swopped_weight = pointer[first][index][0] + pointer[second][index_2][0]
+    #             if current_weight > swopped_weight:
+    #                 # print("Array is: ", end="")
+    #                 # print(choices)
+    #                 # print(f"Swopping {first} with {second}")
+    #                 temp = choices[first]
+    #                 choices[first] = choices[second]
+    #                 choices[second] = temp
     #                 print("Array is: ", end="")
     #                 print(choices)
     # print("==================")
@@ -159,36 +230,36 @@ def calculatePos(object, size):
     return int(x_min), int(y_min), int(x_max), int(y_max)
 
 def check_match(existing, new, comb):
-    flag = -1
-    og_weight = 0
-    # print("Old: ", end="")
-    # print(existing)
-    # print("New: ", end="")
-    # print(new)
-    for index,key in enumerate(comb):
-        og_weight += weight(new[index],existing[key])
-    # print("og_weight: ", end="")
-    # print(og_weight)
-    temp = existing
-    difference = 0
-    best_comb = comb
-    for index,obj in enumerate(existing):
-        temp[index] = {"placeholder":True, "id":-1}
-        combination = calculate_min_comb(existing, new)
-        new_weight = 0
-        for index,key in enumerate(combination):
-            new_weight += weight(new[index],existing[key])
-        # print("New weight: ", end="")
-        # print(new_weight)
-        print("Difference: ", end="")
-        print(difference)
-        if og_weight - new_weight > difference:
-            difference = og_weight - new_weight
-            if difference > 3000:
-                print("Difference is big!!")
-                best_comb = combination
-                flag = index
-        temp[index] = obj
+    # flag = -1
+    # og_weight = 0
+    # # print("Old: ", end="")
+    # # print(existing)
+    # # print("New: ", end="")
+    # # print(new)
+    # for index,key in enumerate(comb):
+    #     og_weight += weight(new[index],existing[key])
+    # # print("og_weight: ", end="")
+    # # print(og_weight)
+    # temp = existing
+    # difference = 0
+    # best_comb = comb
+    # for index,obj in enumerate(existing):
+    #     temp[index] = {"placeholder":True, "id":-1}
+    #     combination = calculate_min_comb(existing, new)
+    #     new_weight = 0
+    #     for index,key in enumerate(combination):
+    #         new_weight += weight(new[index],existing[key])
+    #     # print("New weight: ", end="")
+    #     # print(new_weight)
+    #     print("Difference: ", end="")
+    #     print(difference)
+    #     if og_weight - new_weight > difference:
+    #         difference = og_weight - new_weight
+    #         if difference > 3000:
+    #             print("Difference is big!!")
+    #             best_comb = combination
+    #             flag = index
+    #     temp[index] = obj
     return flag, best_comb
     
 
@@ -219,6 +290,19 @@ class Tracker:
             else:
                 colour = (255,255,255)
             image = cv2.putText(image, str(o["id"]), (c_x-10,c_y), cv2.FONT_HERSHEY_SIMPLEX, 1, colour, 2, cv2.LINE_AA) 
+        for object in self.objects:
+            if object["label"] == "person":
+                if object["confidence"] < 0.55:
+                    colour = (18,217,0)
+                elif object["confidence"] < 0.75:
+                    colour = (255,247,0)
+                elif object["confidence"] < cfg["trigger"]["single_frame"]:
+                    colour = (252,181,0)
+                else:
+                    colour = (255,0,0)
+                image = cv2.rectangle(image, (object["x_min"], object["y_min"]), (object["x_max"], object["y_max"]), RGB(colour), 2)
+            elif object["label"] == "dog":
+                image = cv2.rectangle(image, (object["x_min"], object["y_min"]), (object["x_max"], object["y_max"]), RGB((255,51,252)), 2)
 
     def replace(self, object, index):
         new_id = 0
@@ -231,70 +315,138 @@ class Tracker:
             new_id += 1
         object["id"] = new_id
         self.objects[index] = object
+    
+    def add(self, object):
+        new_id = 0
+        temp = sorted(self.objects, key=take_id)
+        for o in temp:
+            if o["id"] < 0:
+                continue
+            if new_id != o["id"]:
+                break
+            new_id += 1
+        object["id"] = new_id
+        object["direction"] = [0,0]
+        self.objects.append(object)
 
     def track(self, objs):
         if len(self.objects) > 0:
             self.objects.sort(key=take_id)
-        if len(self.objects) > len(objs):
-            for i in range(len(self.objects) - len(objs)):
-                objs.append({"placeholder":True, "id":-(i+1)})
-        elif len(self.objects) < len(objs):
-            for i in range(len(objs) - len(self.objects)):
-                self.objects.append({"placeholder":True, "id":-(i+1)})
         comb = calculate_min_comb(self.objects, objs)
         print("comb: ", end="")
         print(comb)
-        flag = False
-        for o in self.objects:
-            if "placeholder" in o:
-                flag = True
-        for o in objs:
-            if "placeholder" in o:
-                flag = True
-        if not flag:
-            ret,combination = check_match(copy.deepcopy(self.objects), copy.deepcopy(objs), comb)
-            # print("Current comb: ", end="")
-            # print(comb)
-            # print("New combination: ", end="")
-            # print(combination)
-            if ret != -1:
-                self.objects[ret] = {"placeholder":True, "id":-1}
-                comb = combination
+        # flag = False
+        # for o in self.objects:
+        #     if "placeholder" in o:
+        #         flag = True
+        # for o in objs:
+        #     if "placeholder" in o:
+        #         flag = True
+        # if not flag:
+        #     ret,combination = check_match(copy.deepcopy(self.objects), copy.deepcopy(objs), comb)
+        #     # print("Current comb: ", end="")
+        #     # print(comb)
+        #     # print("New combination: ", end="")
+        #     # print(combination)
+        #     if ret != -1:
+        #         self.objects[ret] = {"placeholder":True, "id":-1}
+        #         comb = combination
         to_remove = []
-        for index, key in enumerate(comb):
-            if not "placeholder" in self.objects[key]:
-                if self.objects[key]["history"] == 1:
-                    c = (self.objects[key]["center"][0] - self.objects[key]["direction"][0], self.objects[key]["center"][1])
-                    print("Center of point is: ", end="")
-                    print(c)
-                    print("Inside? ", end="")
-                    print(cv2.pointPolygonTest(contour, c, False) == 1)
-                    if cv2.pointPolygonTest(contour, c, False) == 1 and self.objects[key]["direction"][0] < 0  and self.objects[key]["label"] == "person":
-                        self.inside += 1
-            if "placeholder" in objs[index]:
-                if self.objects[key]["history"] == 1:
-                    to_remove.append(self.objects[key])
+        # flag = False
+        # for choice in comb:
+        #     if choice == -1:
+        #         flag = True
+        #         break
+        # if photo_index == 55:
+        #     pdb.set_trace()
+        history_indices = [index for index,obj in enumerate(self.objects) if index not in comb]
+        for index,key in enumerate(history_indices):
+            if self.objects[key]["history"] == 1:
+                to_remove.append(self.objects[key]["id"])
+            else:
                 self.objects[key]["history"] += 1
                 self.objects[key]["center"][0] += self.objects[key]["direction"][0]
                 self.objects[key]["center"][1] += self.objects[key]["direction"][1]
-            elif "placeholder" in self.objects[key]:
-                objs[index]["direction"] = [0,0]
-                self.replace(objs[index], key)
+        for index, key in enumerate(comb):
+            if key == -1:
+                self.add(objs[index])
             else:
                 objs[index]["id"] = self.objects[key]["id"]
                 delta_x = objs[index]["center"][0] - self.objects[key]["center"][0]
                 delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
                 objs[index]["direction"] = [delta_x, delta_y]
-                if cv2.pointPolygonTest(contour, tuple(objs[index]["center"]), False) == -1 and objs[index]["label"] == "person":
-                    if cv2.pointPolygonTest(contour, tuple(self.objects[key]["center"]), False) == 1:
+                area = (objs[index]["x_max"] - objs[index]["x_min"]) * (objs[index]["y_max"] - objs[index]["y_min"])
+                if cv2.pointPolygonTest(contour, tuple(objs[index]["center"]), False) == -1 and objs[index]["label"] == "person" and area > 20000:
+                    if cv2.pointPolygonTest(contour, tuple(self.objects[key]["center"]), False) == 1 and self.objects[key]["history"] == 0:
                         c = (self.objects[key]["center"][0], self.objects[key]["center"][1])
                     else:
-                        c = (self.objects[key]["center"][0]-delta_x*0.3, self.objects[key]["center"][1]-delta_y*0.3)
+                        if not "out" in self.objects[key]:
+                            c = (self.objects[key]["center"][0]-delta_x*0.4, self.objects[key]["center"][1]-delta_y*0.4)
+                        else:
+                            c = (self.objects[key]["center"][0], self.objects[key]["center"][1])
+                            del self.objects[key]["out"]
                     if cv2.pointPolygonTest(contour, c, False) == 1:
+                        objs[index]["out"] = True
                         self.inside -= 1
+                if "in" in self.objects[key]:
+                    objs[index]["in"] = self.objects[key]["in"]
+                if self.objects[key]["label"] == objs[index]["label"]:
+                    print("This is true!!")
+                    print("Original confidence: ", end="")
+                    print(self.objects[index]["confidence"])
+                    objs[index]["confidence"] = min(1, objs[index]["confidence"] + self.objects[key]["confidence"])
                 self.objects[key] = objs[index]
                 self.objects[key]["history"] = 0
-        for obj in to_remove:
+
+        for obj in self.objects:
+            area = (obj["x_max"] - obj["x_min"]) * (obj["y_max"] - obj["y_min"])
+            if obj["history"] == 1:
+                if cv2.pointPolygonTest(contour, tuple(obj["center"]), False) == 1 and obj["direction"][0] < 0 and area > 20000 and (not "in" in obj):
+                    self.inside += 1
+                if "in" in obj:
+                    del obj["in"]
+                to_remove.append(obj["id"])
+            else:
+                if cv2.pointPolygonTest(contour, tuple(obj["center"]), False) == 1 and obj["direction"][0] < 0 and area > 20000 and (not "in" in obj):
+                    id = obj["id"]
+                    print(f"Obj is inside and left and big and in is not in obj, inside is {self.inside} and object has id {id}")
+                    obj["in"] = True
+                    self.inside += 1
+
+            # if not "placeholder" in self.objects[key]:
+            #     if self.objects[key]["history"] == 1:
+            #         c = (self.objects[key]["center"][0] - self.objects[key]["direction"][0], self.objects[key]["center"][1])
+            #         print("Center of point is: ", end="")
+            #         print(c)
+            #         print("Inside? ", end="")
+            #         print(cv2.pointPolygonTest(contour, c, False) == 1)
+            #         if cv2.pointPolygonTest(contour, c, False) == 1 and self.objects[key]["direction"][0] < 0  and self.objects[key]["label"] == "person":
+            #             self.inside += 1
+            # elif "placeholder" in objs[index]:
+            #     if self.objects[key]["history"] == 1:
+            #         to_remove.append(self.objects[key])
+            #     self.objects[key]["history"] += 1
+            #     self.objects[key]["center"][0] += self.objects[key]["direction"][0]
+            #     self.objects[key]["center"][1] += self.objects[key]["direction"][1]
+            # elif "placeholder" in self.objects[key]:
+            #     objs[index]["direction"] = [0,0]
+            #     self.replace(objs[index], key)
+            # else:
+            #     objs[index]["id"] = self.objects[key]["id"]
+            #     delta_x = objs[index]["center"][0] - self.objects[key]["center"][0]
+            #     delta_y = objs[index]["center"][1] - self.objects[key]["center"][1]
+            #     objs[index]["direction"] = [delta_x, delta_y]
+            #     if cv2.pointPolygonTest(contour, tuple(objs[index]["center"]), False) == -1 and objs[index]["label"] == "person":
+            #         if cv2.pointPolygonTest(contour, tuple(self.objects[key]["center"]), False) == 1:
+            #             c = (self.objects[key]["center"][0], self.objects[key]["center"][1])
+            #         else:
+            #             c = (self.objects[key]["center"][0]-delta_x*0.3, self.objects[key]["center"][1]-delta_y*0.3)
+            #         if cv2.pointPolygonTest(contour, c, False) == 1:
+            #             self.inside -= 1
+            #     self.objects[key] = objs[index]
+            #     self.objects[key]["history"] = 0
+        objects_to_remove = [obj for obj in self.objects if obj["id"] in to_remove]
+        for obj in objects_to_remove:
             self.objects.remove(obj)
     
     def get_max(self, extra_obj):
@@ -332,7 +484,9 @@ try:
 except OSError: 
     print ('Error: Creating directory for out')
 
-cap = cv2.VideoCapture(f'media/videos/{file_name}.mp4')
+cap = cv2.VideoCapture(f'media/videos/{file_name}.avi')
+print("Cap is opened? ", end="")
+print(cap.isOpened())
 
 fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
 
@@ -364,7 +518,8 @@ index = 0
 photo_index = 0
 while(1):
     ret, frame = cap.read()
-    # cv2.imwrite(f'media/out/1_3/clean{index}.jpg',frame)
+    #print(f"Video was read correctly? {ret}")
+    #cv2.imwrite(f'media/out/{file_name}/clean{index}.jpg',frame)
 
     if ret == False:
         break
@@ -467,7 +622,7 @@ while(1):
                     colour = (252,181,0)
                 else:
                     colour = (255,0,0)
-                image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB(colour), 2)
+                # image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB(colour), 2)
             elif object["label"] == "dog":
                 if same(object, persons):
                     continue
@@ -475,7 +630,7 @@ while(1):
                 c_x = int(x_min + (x_max-x_min)/2)
                 c_y = int(y_min + (y_max-y_min)/2)
                 ai_obs.append({"center":[c_x,c_y], "x_min":x_min, "y_min":y_min, "x_max":x_max, "y_max":y_max, "label":"dog", "confidence":object["confidence"], "history":0})
-                image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
+                # image = cv2.rectangle(image, (x_min,y_min), (x_max,y_max), RGB((255,51,252)), 2)
         
         tracker.track(copy.deepcopy(ai_obs))
         tracker.label(image)
